@@ -6,21 +6,21 @@
 /* --- Tokens --- */
 :root {
   /* Colors */
-  --color-bg: #0a0e1a;
-  --color-bg-card: rgba(15, 23, 42, 0.65);
-  --color-bg-card-solid: #0f172a;
-  --color-surface: #1e293b;
-  --color-border: rgba(59, 130, 246, 0.15);
-  --color-border-hover: rgba(59, 130, 246, 0.35);
+  --color-bg: #020a07;
+  --color-bg-card: rgba(5, 20, 15, 0.65);
+  --color-bg-card-solid: #05140f;
+  --color-surface: #0f3d26;
+  --color-border: rgba(16, 185, 129, 0.15);
+  --color-border-hover: rgba(16, 185, 129, 0.35);
   --color-text: #e2e8f0;
   --color-text-muted: #94a3b8;
   --color-text-heading: #f8fafc;
-  --color-accent: #3b82f6;
-  --color-accent-light: #60a5fa;
-  --color-gold: #f5a623;
-  --color-gold-hover: #fbbf24;
+  --color-accent: #10b981;
+  --color-accent-light: #34d399;
+  --color-gold: #fbbf24;
+  --color-gold-hover: #f59e0b;
   --color-success: #22d3ee;
-  --color-pink: #ec4899;
+  --color-pink: #0ea5e9;
 
   /* Typography */
   --font-heading: "Space Grotesk", sans-serif;
@@ -40,8 +40,8 @@
 
   /* Shadows */
   --shadow-card: 0 4px 30px rgba(0, 0, 0, 0.35);
-  --shadow-glow: 0 0 40px rgba(59, 130, 246, 0.12);
-  --shadow-cta: 0 0 20px rgba(245, 166, 35, 0.35);
+  --shadow-glow: 0 0 40px rgba(16, 185, 129, 0.12);
+  --shadow-cta: 0 0 20px rgba(16, 185, 129, 0.35);
 }
 
 /* --- Reset & Base --- */
@@ -104,7 +104,7 @@ ul {
   padding: 0.3rem 0.9rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
-  background: rgba(59, 130, 246, 0.08);
+  background: rgba(16, 185, 129, 0.08);
 }
 
 .section-title {
@@ -184,7 +184,7 @@ ul {
 
 .btn-secondary:hover {
   border-color: var(--color-accent);
-  background: rgba(59, 130, 246, 0.08);
+  background: rgba(16, 185, 129, 0.08);
 }
 
 /* ==============================
@@ -318,12 +318,12 @@ ul {
   background:
     radial-gradient(
       ellipse 70% 50% at 50% 45%,
-      rgba(59, 130, 246, 0.08) 0%,
+      rgba(16, 185, 129, 0.08) 0%,
       transparent 65%
     ),
     radial-gradient(
       ellipse 50% 40% at 75% 25%,
-      rgba(236, 72, 153, 0.04) 0%,
+      rgba(14, 165, 233, 0.04) 0%,
       transparent 55%
     );
   z-index: 0;
@@ -332,8 +332,8 @@ ul {
 .hero-bg {
   position: absolute;
   inset: 0;
-  background: url("assets/hero-bg.webp") center/cover no-repeat;
-  opacity: 0.15;
+  background: url("assets/hero-bg.png") center/cover no-repeat;
+  opacity: 0.30;
   z-index: -1;
 }
 
@@ -423,7 +423,7 @@ ul {
   justify-content: center;
   border-radius: 14px;
   font-size: 1.5rem;
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(16, 185, 129, 0.1);
   border: 1px solid var(--color-border);
 }
 
@@ -616,8 +616,8 @@ ul {
   padding: 5rem var(--container-px);
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.08) 0%,
-    rgba(236, 72, 153, 0.06) 100%
+    rgba(16, 185, 129, 0.08) 0%,
+    rgba(14, 165, 233, 0.06) 100%
   );
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
