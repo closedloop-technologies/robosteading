@@ -2,19 +2,45 @@
   "zones": [
     {
       "name": "heater",
-      "polygon": [[180, 120], [430, 120], [430, 360], [180, 360]]
+      "kind": "zone",
+      "assign_chicks": true,
+      "polygon": [[170, 115], [430, 115], [430, 360], [170, 360]],
+      "color": "#ef4444"
     },
     {
       "name": "turf",
-      "polygon": [[430, 120], [760, 120], [760, 480], [430, 480]]
-    },
-    {
-      "name": "food_water",
-      "polygon": [[80, 360], [430, 360], [430, 620], [80, 620]]
+      "kind": "zone",
+      "assign_chicks": true,
+      "polygon": [[430, 115], [640, 115], [640, 430], [430, 430]],
+      "color": "#22c55e"
     },
     {
       "name": "cool",
-      "polygon": [[430, 20], [820, 20], [820, 120], [430, 120]]
+      "kind": "zone",
+      "assign_chicks": true,
+      "polygon": [[170, 20], [640, 20], [640, 115], [170, 115]],
+      "color": "#38bdf8"
+    },
+    {
+      "name": "food",
+      "kind": "object",
+      "assign_chicks": false,
+      "polygon": [[80, 230], [305, 230], [305, 480], [80, 480]],
+      "color": "#f97316"
+    },
+    {
+      "name": "water",
+      "kind": "object",
+      "assign_chicks": false,
+      "polygon": [[535, 80], [610, 80], [610, 360], [535, 360]],
+      "color": "#0ea5e9"
+    },
+    {
+      "name": "waste_watch",
+      "kind": "object",
+      "assign_chicks": false,
+      "polygon": [[145, 130], [545, 130], [545, 335], [145, 335]],
+      "color": "#7c3f1d"
     }
   ]
 }

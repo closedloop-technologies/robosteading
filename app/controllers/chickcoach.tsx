@@ -3,18 +3,27 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 import { adminCookie, clearAdminCookie, adminToken, isAdminRequest } from '../data/auth.ts'
+import { assistAnnotation } from '../data/annotation-assist.server.ts'
+import { addAudioSpectrumFrame, latestAudioSpectrumFrame } from '../data/audio.server.ts'
 import { answerChickQuestion } from '../data/chat.server.ts'
 import {
+  addAnnotation,
   addManualNote,
   addObservation,
   allObservations,
   getZones,
   isPublicVisible,
   latestObservation,
+  listAnnotations,
+  listChickIdentities,
   listManualNotes,
   listObservations,
   replaceZones,
   setPublicVisible,
+  upsertChickIdentity,
+  type ChickIdentity,
+  type BrooderAnnotation,
+  type Detection,
   type Observation,
 } from '../data/store.ts'
 import { PageShell, SafetyBanner, StatusLine } from '../ui/layout.tsx'
@@ -26,9 +35,17 @@ export const live = {
     let latest = await latestObservation()
     let recent = await listObservations(30)
     let visible = await isPublicVisible()
+    let annotations = await listAnnotations()
+    let chickIdentities = await listChickIdentities()
     return render(
       <PageShell title="BroodCast Live" description="A window into the secret life of chicks.">
-        <LivePage latest={latest} recent={recent} visible={visible} />
+        <LivePage
+          latest={latest}
+          recent={recent}
+          visible={visible}
+          annotations={annotations}
+          chickIdentities={chickIdentities}
+        />
       </PageShell>,
       request,
     )
@@ -126,6 +143,34 @@ export const apiObservations = {
   },
 }
 
+export const apiLatestAudioSpectrum = {
+  async handler({ url }: { url: URL }) {
+    let after = Number(url.searchParams.get('after') ?? '0')
+    return json({ frame: latestAudioSpectrumFrame(Number.isFinite(after) ? after : 0) })
+  },
+}
+
+export const apiIngestAudioSpectrum = {
+  async handler({ request }: { request: Request }) {
+    let expected = process.env.STREAM_INGEST_TOKEN ?? 'dev-stream-token'
+    let auth = request.headers.get('authorization') ?? ''
+    let token = auth.replace(/^Bearer\s+/i, '') || request.headers.get('x-stream-token')
+    if (token !== expected) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+    let body = await readJson(request)
+    if (!body || typeof body !== 'object') {
+      return json({ ok: false, error: 'Expected JSON body.' }, { status: 400 })
+    }
+
+    try {
+      let frame = addAudioSpectrumFrame(body as Record<string, unknown>)
+      return json({ ok: true, frame_id: frame.id })
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : 'Invalid audio frame.' }, { status: 400 })
+    }
+  },
+}
+
 export const apiIngestObservation = {
   async handler({ request }: { request: Request }) {
     let expected = process.env.STREAM_INGEST_TOKEN ?? 'dev-stream-token'
@@ -168,6 +213,96 @@ export const apiChat = {
       await listManualNotes({ includePrivate: isAdminRequest(request) }),
     )
     return json(answer)
+  },
+}
+
+export const apiAnnotations = {
+  async handler({ request }: { request: Request }) {
+    if (request.method === 'GET') {
+      return json({
+        annotations: await listAnnotations(),
+        chick_identities: await listChickIdentities(),
+      })
+    }
+
+    let body = await readJson(request)
+    if (!body || typeof body !== 'object') {
+      return json({ ok: false, error: 'Expected JSON body.' }, { status: 400 })
+    }
+
+    let input = body as Record<string, unknown>
+    let label = String(input.label ?? '').trim()
+    let kind: 'box' | 'point' = input.kind === 'point' ? 'point' : 'box'
+    let box = Array.isArray(input.box) ? input.box.map(Number).slice(0, 4) : null
+    let point = Array.isArray(input.point) ? input.point.map(Number).slice(0, 2) : null
+    let imageSize = Array.isArray(input.image_size) ? input.image_size.map(Number).slice(0, 2) : null
+
+    if (!label) return json({ ok: false, error: 'Label is required.' }, { status: 400 })
+    if (kind === 'box' && (!box || box.length !== 4)) {
+      return json({ ok: false, error: 'Box annotations need four coordinates.' }, { status: 400 })
+    }
+    if (kind === 'point' && (!point || point.length !== 2)) {
+      return json({ ok: false, error: 'Point annotations need two coordinates.' }, { status: 400 })
+    }
+
+    let annotation = await addAnnotation({
+      label,
+      kind,
+      color: typeof input.color === 'string' ? input.color : undefined,
+      observation_id: typeof input.observation_id === 'string' ? input.observation_id : null,
+      frame_id: typeof input.frame_id === 'string' ? input.frame_id : null,
+      box,
+      point,
+      image_size: imageSize,
+      created_by: typeof input.created_by === 'string' ? input.created_by : 'kid',
+    })
+    return json({ ok: true, annotation })
+  },
+}
+
+export const apiAnnotationAssist = {
+  async handler({ request }: { request: Request }) {
+    let body = await readJson(request)
+    let input = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
+    let observationId = typeof input.observation_id === 'string' ? input.observation_id : null
+    let latest = await latestObservation()
+    let recent = await listObservations(60)
+    let observation = recent.find((item) => item.id === observationId) ?? latest
+    let detections = Array.isArray(input.detections) ? (input.detections as Detection[]) : observation?.detections ?? []
+    let draft = input.draft && typeof input.draft === 'object' ? (input.draft as any) : null
+
+    let result = await assistAnnotation({
+      observation,
+      detections,
+      annotations: await listAnnotations(),
+      chickIdentities: await listChickIdentities(),
+      draft,
+    })
+
+    return json({ ok: true, ...result })
+  },
+}
+
+export const apiChickNames = {
+  async handler({ request }: { request: Request }) {
+    let body = await readJson(request)
+    if (!body || typeof body !== 'object') {
+      return json({ ok: false, error: 'Expected JSON body.' }, { status: 400 })
+    }
+
+    let input = body as Record<string, unknown>
+    let trackId = String(input.track_id ?? '').trim()
+    let name = String(input.name ?? '').trim()
+    let exampleBbox = Array.isArray(input.example_bbox) ? input.example_bbox.map(Number).slice(0, 4) : null
+    if (!trackId || !name) return json({ ok: false, error: 'Track and name are required.' }, { status: 400 })
+
+    let identity = await upsertChickIdentity({
+      track_id: trackId,
+      name,
+      observation_id: typeof input.observation_id === 'string' ? input.observation_id : null,
+      example_bbox: exampleBbox,
+    })
+    return json({ ok: true, identity })
   },
 }
 
@@ -226,7 +361,19 @@ export const apiReport = {
 }
 
 function LivePage() {
-  return ({ latest, recent, visible }: { latest: Observation | null; recent: Observation[]; visible: boolean }) => (
+  return ({
+    latest,
+    recent,
+    visible,
+    annotations,
+    chickIdentities,
+  }: {
+    latest: Observation | null
+    recent: Observation[]
+    visible: boolean
+    annotations: BrooderAnnotation[]
+    chickIdentities: ChickIdentity[]
+  }) => (
     <section className="cc-section live-page">
       <SafetyBanner />
       <div className="hero-row">
@@ -249,7 +396,7 @@ function LivePage() {
       <div className="live-grid">
         <section className="panel stream-panel">
           <div id="stale-warning" className="stale-warning hidden"></div>
-          <div className="stream-frame">
+          <div id="live-stream-frame" className="stream-frame annotatable-frame">
             {latest?.annotated_frame_url ? (
               <img id="live-image" src={latest.annotated_frame_url} alt="Latest annotated BroodCast frame" />
             ) : (
@@ -257,6 +404,20 @@ function LivePage() {
                 Waiting for the BroodCast to begin...
               </div>
             )}
+            <canvas id="annotation-canvas" aria-label="Brooder annotation canvas"></canvas>
+            <button
+              id="fullscreen-stream-button"
+              className="stream-fullscreen-button"
+              type="button"
+              aria-label="Show stream full screen"
+            >
+              Full screen
+            </button>
+            <div id="annotation-freeze-badge" className="freeze-badge hidden">Frozen for annotation</div>
+          </div>
+          <div className="annotation-toolbar">
+            <button id="freeze-frame-button" className="btn btn-secondary" type="button">Freeze frame</button>
+            <button id="resume-stream-button" className="btn btn-secondary hidden" type="button">Resume stream</button>
           </div>
           <StatusLine observation={latest} />
         </section>
@@ -271,11 +432,118 @@ function LivePage() {
         </aside>
       </div>
 
+      <section className="panel audio-panel">
+        <div className="panel-heading-row">
+          <div>
+            <h2>Audio Spectrogram</h2>
+            <p id="audio-status" className="muted">Start audio to view the Python audio stream.</p>
+          </div>
+          <div className="audio-controls">
+            <label>
+              Channels
+              <select id="audio-channel-mode">
+                <option value="mono">Mono</option>
+                <option value="stereo">Stereo</option>
+              </select>
+            </label>
+            <button id="audio-start-button" className="btn btn-primary" type="button">Start stream</button>
+            <button id="audio-stop-button" className="btn btn-secondary hidden" type="button">Stop</button>
+          </div>
+        </div>
+        <div className="spectrogram-shell" aria-label="Live audio spectrogram">
+          <canvas id="audio-spectrogram"></canvas>
+          <div className="spectrogram-axis">
+            <span>High</span>
+            <span>Hz</span>
+            <span>Low</span>
+          </div>
+        </div>
+        <div id="audio-meter-row" className="audio-meter-row">
+          <div>
+            <span>Left / mono</span>
+            <meter id="audio-meter-left" min="0" max="1" value="0"></meter>
+          </div>
+          <div>
+            <span>Right</span>
+            <meter id="audio-meter-right" min="0" max="1" value="0"></meter>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="annotation-lab"
+        className="panel annotation-lab"
+        data-observation-id={latest?.id ?? ''}
+        data-frame-id={latest?.frame_id ?? ''}
+        data-detections={JSON.stringify(latest?.detections ?? [])}
+        data-annotations={JSON.stringify(annotations.slice(0, 80))}
+        data-chick-identities={JSON.stringify(chickIdentities)}
+      >
+        <div>
+          <h2>Annotation Lab</h2>
+          <p className="muted">Click or drag on the image to freeze a frame, draw labels, and get Kimi/BAML help.</p>
+        </div>
+        <div className="annotation-grid">
+          <form id="part-annotation-form" className="stack-form">
+            <label>
+              Label
+              <input name="label" list="brooder-labels" placeholder="heater, water, food, waste..." required />
+            </label>
+            <datalist id="brooder-labels">
+              <option value="heater"></option>
+              <option value="water"></option>
+              <option value="food"></option>
+              <option value="waste"></option>
+              <option value="bedding"></option>
+              <option value="chick"></option>
+            </datalist>
+            <label>
+              Shape
+              <select name="kind">
+                <option value="box">Box</option>
+                <option value="point">Point</option>
+              </select>
+            </label>
+            <input type="hidden" name="geometry" />
+            <button className="btn btn-primary" type="submit">
+              Save annotation
+            </button>
+          </form>
+          <form id="chick-name-form" className="stack-form">
+            <label>
+              Detected chick
+              <select name="track_id">
+                {(latest?.detections ?? []).map((detection) => (
+                  <option value={detection.track_id} key={detection.track_id}>
+                    {detection.track_id} · {detection.zone}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Name
+              <input name="name" placeholder="Peep, Dot, Stripe..." required />
+            </label>
+            <button className="btn btn-secondary" type="submit">
+              Save name
+            </button>
+          </form>
+          <div>
+            <h3>Saved labels</h3>
+            <div id="annotation-list" className="tag-list"></div>
+            <h3>Chick names</h3>
+            <div id="chick-name-list" className="tag-list"></div>
+            <h3>Kimi assist</h3>
+            <div id="annotation-assist" className="annotation-assist muted">Draw or click on the frozen frame for help.</div>
+          </div>
+        </div>
+      </section>
+
       <section className="panel">
         <h2>Recent Observations</h2>
         <ObservationTable observations={recent.slice(0, 8)} />
       </section>
-      <script src="/chickcoach.js?v=live-refresh-2"></script>
+      <script src="/chickcoach.js?v=python-audio-spectrogram-1"></script>
     </section>
   )
 }

@@ -4,10 +4,13 @@ creds.json
 node_modules/
 .firecrawl/
 dist/
+repomix-output.xml
 tmp/
+debug_frames/
 public/uploads/*
 !public/uploads/.gitkeep
 __pycache__/
 *.pyc
 services/inference/debug_frames/
 services/inference/*.pt
+services/inference/*.pth

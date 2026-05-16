@@ -10,6 +10,7 @@ It currently:
 - Assigns detections to configured zones.
 - Draws annotations.
 - Pushes observation JSON and the latest annotated JPEG to `/api/ingest/observation`.
+- Can push normalized audio spectrum frames to `/api/audio/spectrum` for the live spectrogram.
 - Can save raw/annotated debug frames and run a finite smoke test.
 - Keeps running when detection or push fails so the next frame can recover.
 
@@ -21,6 +22,17 @@ python3 -m venv .venv
 pip install -r requirements.txt
 CHICKCOACH_API_URL=http://localhost:44100 STREAM_INGEST_TOKEN=dev-stream-token python main.py
 ```
+
+From the repo root, run both local dev loops together:
+
+```sh
+npm run dev
+```
+
+That starts the Remix server in `tsx watch` mode and the webcam worker under `watchmedo
+auto-restart`. Edits to `server.ts`, `app/**`, or generated BAML files restart the web server.
+Edits to `services/inference/**/*.py` or `services/inference/**/*.json` restart the worker.
+Use `Ctrl-C` once to stop both processes.
 
 Run it in Docker with the brooder camera:
 
@@ -59,6 +71,9 @@ CHICKCOACH_DETECTOR=falcon FALCON_MODEL=tiiuae/Falcon-Perception-300M python mai
 
 # Practical local detector fallback. COCO class 14 is "bird"; set YOLO_CLASS_IDS=all to inspect all classes.
 CHICKCOACH_DETECTOR=yolo YOLO_MODEL=yolov8n.pt python main.py
+
+# RF-DETR detector. The default RFDETR_CLASS_IDS=14 keeps COCO "bird" detections as chick candidates.
+CHICKCOACH_DETECTOR=rfdetr RFDETR_MODEL=nano RFDETR_CLASS_IDS=14 python main.py
 ```
 
 Environment variables:
@@ -73,6 +88,7 @@ Environment variables:
 - `CHICKCOACH_DETECTION_PROMPTS`: comma-separated prompt list. Defaults to `baby chick,white chick,baby chicken,small white bird`.
 - `CHICKCOACH_SAVE_FRAMES=1`: save raw and annotated frames.
 - `CHICKCOACH_SAVE_FRAME_HISTORY=1`: save timestamped debug frames in addition to `latest_raw.jpg` and `latest_annotated.jpg`.
+- `CHICKCOACH_SAVE_MANIFEST=0`: disable `manifest.jsonl` writes when frame history is enabled. The manifest records each saved frame path, detector mode, stats, and detections for later model testing.
 - `CHICKCOACH_DEBUG_DIR`: debug frame directory. Defaults to `debug_frames`.
 - `CHICKCOACH_PREVIEW=1`: open a local OpenCV preview window.
 - `CHICKCOACH_MAX_FRAMES`: stop after this many frames, useful for smoke tests.
@@ -88,6 +104,27 @@ Environment variables:
 - `YOLO_CONFIDENCE`: confidence threshold. Defaults to `0.15`.
 - `YOLO_IMAGE_SIZE`: inference image size. Defaults to `640`.
 - `YOLO_MAX_DETECTIONS`: max boxes to pass through. Defaults to `8`.
+- `CHICKCOACH_MIN_CHICK_BOX_WIDTH` / `CHICKCOACH_MIN_CHICK_BOX_HEIGHT`: reject tiny detections before labeling them as chicks. Both default to `45` pixels to avoid poop/feed false positives.
+- `CHICKCOACH_MIN_CHICK_BOX_AREA`: reject small detection boxes. Defaults to `2500` pixels.
+- `CHICKCOACH_LIGHT_BLOB_FALLBACK=1`: optional experimental fallback for large white feather blobs when YOLO finds no plausible chicks. Disabled by default because white bedding can look similar.
+- `RFDETR_MODEL`: `nano`, `small`, `medium`, `base`, or `large`. Defaults to `nano`.
+- `RFDETR_CLASS_IDS`: comma-separated COCO class IDs. Defaults to `14` for bird. Use `all` to keep all detections.
+- `RFDETR_CONFIDENCE`: confidence threshold. Defaults to `0.03`.
+- `RFDETR_MAX_DETECTIONS`: max boxes to pass through. Defaults to `12`.
 
 Falcon-Perception is loaded lazily on the first frame. The first run may download model weights and
 compile kernels, so expect it to be much slower than later frames.
+
+Audio spectrum frames use the same `CHICKCOACH_API_URL` and `STREAM_INGEST_TOKEN` values. Post one
+or two normalized frequency-bin arrays with values from `0` to `1`:
+
+```py
+from stream_client import push_audio_spectrum
+
+push_audio_spectrum(
+    bins=[left_bins, right_bins],  # use one array for mono
+    sample_rate=48000,
+    channels=2,
+    levels=[left_rms, right_rms],
+)
+```

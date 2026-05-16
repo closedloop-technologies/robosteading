@@ -1,7 +1,7 @@
 # RoboSteading Agent Guide
 
-RoboSteading is a Remix 3 app with a ChickCoach live-observation feature and a local Python
-inference worker. Use these conventions when continuing to build it out.
+RoboSteading is a Remix 3 app with a ChickCoach live-observation feature and an edge Python
+capture/inference service. Use these conventions when continuing to build it out.
 
 ## Requirements
 
@@ -9,6 +9,29 @@ inference worker. Use these conventions when continuing to build it out.
 - Run `npm i` before local development.
 - Python inference work lives under `services/inference/` and uses its own virtualenv plus
   `services/inference/requirements.txt`.
+
+## ChickCoach Architecture
+
+- The Python service runs on an edge device near the animals: local laptop, phone, Mac mini, small
+  desktop, or similar. It should be connected to at least one webcam and may also use one or more
+  microphones.
+- The Remix webserver can run on the same machine, a different computer on the local network, or a
+  cloud host such as Fly.io. Do not assume edge capture and web serving are colocated.
+- The webserver is responsible for authenticated APIs, public/admin UI, chat-agent access, bucket
+  storage integration, and database-backed querying of observations, metrics, annotations, and
+  behavior history.
+- Production media storage should use S3-compatible bucket storage for images and video. Structured
+  annotations, peep metrics, outliers, model metadata, and chat-agent queryable statistics belong in
+  the database.
+- The edge service reads video and optional audio, processes them locally, and pushes allowed media
+  and structured outputs to the webserver. Keep ingestion APIs narrow and token-protected.
+- Video has two paths: a direct stream/upload path to the webserver for viewing/storage, and a
+  parallel web-annotation path where frames are segmented, annotated, scored, and reduced to
+  structured metrics/outliers before being pushed to the webserver.
+- Audio must go through a local peep-detection/privacy filter before upload. Preserve animal sounds,
+  peeps, squeals, and distress signals as derived events or coarse spectra, but do not upload raw
+  audio, speech transcripts, voiceprints, or any representation from which spoken language should be
+  extractable.
 
 ## Commands
 
@@ -49,8 +72,9 @@ validation, hydration, and testing conventions.
 - `scripts/build-static.mjs` builds `dist/` by copying `public/`, rendering the home page, and
   writing `CNAME`.
 - `dnsconfig.js` contains DNSControl config for `robosteading.com`.
-- `services/inference/` contains the local webcam/OpenCV worker that posts observations to the
-  Remix API.
+- `services/inference/` contains the edge webcam/audio capture and inference service that posts
+  observations, annotated frames, peep metrics, and eventually media-stream metadata to the Remix
+  API.
 
 ## Route Ownership
 
@@ -66,15 +90,19 @@ validation, hydration, and testing conventions.
 
 ## ChickCoach Notes
 
-- Runtime state is stored in `tmp/chickcoach-store.json` by `app/data/store.ts`; `tmp/` is scratch
-  data and should not be treated as source.
-- Uploaded annotated frames are written under `public/uploads/` by the ingest endpoint.
+- Current development runtime state is stored in `tmp/chickcoach-store.json` by
+  `app/data/store.ts`; `tmp/` is scratch data and should not be treated as source. The target
+  architecture uses a real database for observations, annotations, metrics, outliers, chat-agent
+  context, and behavior exploration.
+- Current development annotated frames are written under `public/uploads/` by the ingest endpoint.
+  The target architecture uses S3-compatible bucket storage for images and video.
 - Admin access is cookie-based and controlled by `ADMIN_TOKEN` or `CHICKCOACH_ADMIN_TOKEN`.
 - Stream ingestion uses `STREAM_INGEST_TOKEN`; the development fallback is `dev-stream-token`.
 - Chat answering uses Kimi/Fireworks when `KIMI_API_KEY` or `FIREWORKS_API_KEY` is available, with
   a deterministic fallback in `app/data/chat.server.ts`.
-- The Python worker should be run from `services/inference/` after the Remix app is running. See
-  `services/inference/README.md` for webcam, fake-camera, preview, and smoke-test commands.
+- The Python edge service should be run from `services/inference/` after the target Remix API is
+  reachable. See `services/inference/README.md` for webcam, fake-camera, preview, and smoke-test
+  commands.
 
 ## Static And Deployment Notes
 

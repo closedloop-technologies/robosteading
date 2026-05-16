@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 
 export type Detection = {
   track_id: string
+  class_name?: string
   zone: string
   bbox: number[]
   centroid: number[]
@@ -46,10 +47,36 @@ export type BrooderZone = {
   active: boolean
 }
 
+export type BrooderAnnotation = {
+  id: string
+  created_at: string
+  label: string
+  kind: 'box' | 'point'
+  color: string
+  observation_id: string | null
+  frame_id: string | null
+  box: number[] | null
+  point: number[] | null
+  image_size: number[] | null
+  created_by: string
+}
+
+export type ChickIdentity = {
+  id: string
+  created_at: string
+  updated_at: string
+  track_id: string
+  name: string
+  observation_id: string | null
+  example_bbox: number[] | null
+}
+
 type StoreState = {
   observations: Observation[]
   manualNotes: ManualNote[]
   zones: BrooderZone[]
+  annotations: BrooderAnnotation[]
+  chickIdentities: ChickIdentity[]
   publicVisible: boolean
 }
 
@@ -70,6 +97,8 @@ function defaultState(): StoreState {
     observations: [],
     manualNotes: [],
     zones: defaultZones,
+    annotations: [],
+    chickIdentities: [],
     publicVisible: true,
   }
 }
@@ -79,6 +108,8 @@ async function loadState() {
 
   try {
     state = JSON.parse(await readFile(storePath, 'utf8')) as StoreState
+    state.annotations ??= []
+    state.chickIdentities ??= []
   } catch {
     state = defaultState()
     await persist()
@@ -174,4 +205,76 @@ export async function setPublicVisible(visible: boolean) {
   let current = await loadState()
   current.publicVisible = visible
   await persist()
+}
+
+export async function listAnnotations() {
+  let current = await loadState()
+  return current.annotations
+}
+
+export async function addAnnotation(input: {
+  label: string
+  kind: 'box' | 'point'
+  color?: string
+  observation_id?: string | null
+  frame_id?: string | null
+  box?: number[] | null
+  point?: number[] | null
+  image_size?: number[] | null
+  created_by?: string
+}) {
+  let current = await loadState()
+  let annotation: BrooderAnnotation = {
+    id: randomUUID(),
+    created_at: new Date().toISOString(),
+    label: input.label,
+    kind: input.kind,
+    color: input.color ?? '#f59e0b',
+    observation_id: input.observation_id ?? null,
+    frame_id: input.frame_id ?? null,
+    box: input.box ?? null,
+    point: input.point ?? null,
+    image_size: input.image_size ?? null,
+    created_by: input.created_by ?? 'kid',
+  }
+  current.annotations = [annotation, ...current.annotations].slice(0, 500)
+  await persist()
+  return annotation
+}
+
+export async function listChickIdentities() {
+  let current = await loadState()
+  return current.chickIdentities
+}
+
+export async function upsertChickIdentity(input: {
+  track_id: string
+  name: string
+  observation_id?: string | null
+  example_bbox?: number[] | null
+}) {
+  let current = await loadState()
+  let now = new Date().toISOString()
+  let existing = current.chickIdentities.find((identity) => identity.track_id === input.track_id)
+  if (existing) {
+    existing.name = input.name
+    existing.updated_at = now
+    existing.observation_id = input.observation_id ?? existing.observation_id
+    existing.example_bbox = input.example_bbox ?? existing.example_bbox
+    await persist()
+    return existing
+  }
+
+  let identity: ChickIdentity = {
+    id: randomUUID(),
+    created_at: now,
+    updated_at: now,
+    track_id: input.track_id,
+    name: input.name,
+    observation_id: input.observation_id ?? null,
+    example_bbox: input.example_bbox ?? null,
+  }
+  current.chickIdentities = [identity, ...current.chickIdentities].slice(0, 100)
+  await persist()
+  return identity
 }

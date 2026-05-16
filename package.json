@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-static.mjs",
-    "dev": "tsx watch server.ts",
+    "dev": "npm run dev:all",
+    "dev:web": "tsx watch server.ts",
+    "dev:worker": "cd services/inference && CHICKCOACH_DETECTOR=yolo CHICKCOACH_FALLBACK_DETECTOR=fake CHICKCOACH_API_URL=http://localhost:44100 CHICKCOACH_SAVE_FRAMES=1 CHICKCOACH_SAVE_FRAME_HISTORY=1 CHICKCOACH_DEBUG_DIR=debug_frames/yolo_brooder CAMERA_INDEX=2 CAPTURE_INTERVAL_SECONDS=0.5 YOLO_MODEL=yolov8n.pt YOLO_CLASS_IDS=14 YOLO_CONFIDENCE=0.03 YOLO_IMAGE_SIZE=960 watchmedo auto-restart --recursive --patterns='*.py;*.json' -- python3 main.py",
+    "dev:all": "node scripts/dev-all.mjs",
     "start": "tsx server.ts",
     "test": "tsx --test",
     "typecheck": "tsc --noEmit"
@@ -13,6 +16,7 @@
     "node": ">=24.3.0"
   },
   "dependencies": {
+    "@boundaryml/baml": "^0.222.0",
     "remix": "^3.0.0-beta.0",
     "tsx": "latest"
   },

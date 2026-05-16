@@ -2,13 +2,75 @@
 
 ## 1. Product summary
 
-**BroodCast Live** is a weekend-built, web-based chick monitoring and education app.
+**BroodCast Live** is a local-first chick monitoring, annotation, and training system that starts as
+a weekend-built web app and grows into a per-family, per-location learning loop.
 
-A laptop webcam watches a temporary chick brooder. A local vision worker uses **Falcon-Perception** to identify chicks in the camera feed, compute simple location/activity stats, and push observations to a deployed **Remix 3** app on **Fly.io**. Visitors can watch a live annotated stream and ask questions about the chicks through a chatbot powered by **Kimi K2.5** and **BAML**. Admin users log in via **magic link** to configure zones, add manual notes, and generate a class report.
+An edge device watches a temporary chick brooder or chicken location. The edge device may be a
+local laptop, phone, Mac mini, small desktop, or similar device connected to at least one webcam and
+optionally one or more microphones. A Python capture/inference service on that edge device reads
+video and audio, streams allowed video/media to the webserver, runs local vision and peep-detection
+pipelines, and pushes structured observations to a **Remix 3** webserver. The webserver may run on
+the same machine, a different computer on the local network, or a cloud host such as **Fly.io**. It
+owns the public/admin UI, authenticated APIs, S3-compatible bucket storage for images and video,
+and a database that chat agents and the webserver can query for key statistics, outliers,
+annotations, model metadata, and behavior history.
+
+The audio path is privacy-preserving by design. The edge service must run audio through a local
+**peep-detection** algorithm that removes or suppresses human voices while preserving as much
+animal sound signal as possible: peeps, squeals, distress cues, and related frequency/energy
+features. Spoken language must not be extractable from anything sent to the webserver. Raw audio,
+voice clips, transcripts, voiceprints, or human-speech features are never streamed to the app.
+Visitors can watch a live annotated stream and ask questions about the chicks through a chatbot
+powered by **Kimi K2.5** and **BAML**. Admin users log in via **magic link** to configure zones, add
+manual notes, and generate a class report.
+
+Longer term, the app must support a family with one or more named chick locations, such as
+brooders, coops, runs, or quarantine pens. Cameras are attached to locations for spans of time, but
+they are not assumed to be stable: they can move, fall, be replaced, change angle, or point at a
+different physical area. The stable product concepts are family, location, named chickens, local
+sensor streams, observations, object detections, scene events, annotations, and model versions.
+
+The training philosophy is online, local-first, and human-in-the-loop. Off-the-shelf vision models
+are useful bootstrap tools, but they should not be trusted to provide high-F1 real-time annotations
+for every family's coop without local calibration and continued learning. The system should use
+local realtime models for segmentation, behavior statistics, and anomaly detection; human
+annotations from the website to correct and enrich labels; and frontier vision LLMs only during
+explicit training or audit moments when selected frames/clips are allowed to leave the local
+environment. Video may be streamed or uploaded to the configured webserver for live viewing and
+storage. Raw audio should remain local; uploaded audio-derived data must be peep-filtered,
+voice-suppressed, and non-reconstructable as spoken language.
 
 The product is observational only. It does not control heat, food, water, lights, motors, or any physical system.
 
-## 1.1 Current implementation state
+## 1.1 Target architecture clarification
+
+BroodCast is split into three operational layers:
+
+1. **Edge capture/inference device.** A Python service runs near the animals on a laptop, phone,
+   Mac mini, small desktop, or similar edge device. It is connected to at least one webcam and may
+   use optional microphones. It reads video/audio, performs local privacy filtering and inference,
+   and pushes media and structured outputs to the webserver.
+2. **Webserver.** The Remix webserver may run locally, elsewhere on the LAN, or in the cloud. It
+   exposes token-protected ingestion APIs, public/admin pages, chat-agent routes, media access, and
+   query APIs for recent and historical behavior.
+3. **Persistence.** The webserver uses S3-compatible bucket storage for images and video, plus a
+   database for observations, annotations, peep metrics, outliers, model versions, calibration
+   metadata, and statistics used by the web UI and chat agents.
+
+Video and audio enter the system at the edge device. Video follows two paths in parallel:
+
+* A direct stream/upload path to the webserver for live viewing and bucket-backed storage.
+* A web-annotation path where frames are segmented, annotated, scored, and reduced to structured
+  metrics and outliers. The annotated frame plus structured annotation payload are pushed to the
+  webserver and persisted for querying.
+
+Audio is processed locally before anything leaves the edge device. The peep-detection algorithm
+must preserve animal peeps, squeals, distress indicators, and coarse frequency/energy signals while
+removing or suppressing human voices. The webserver may receive derived peep events, aggregate
+statistics, and coarse spectra that are useful for the live spectrogram and chat context, but spoken
+language must not be extractable from uploaded data.
+
+## 1.2 Current implementation state
 
 As of the current repo state, BroodCast has an end-to-end weekend MVP scaffold inside the existing
 RoboSteading site.
@@ -28,17 +90,21 @@ Shipped locally:
 * BAML prompt/schema files exist in `baml_src/`, but runtime chat currently calls Fireworks directly.
 * Safety docs, weekend runbook, and report template exist in `docs/`.
 * A Python worker scaffold exists in `services/inference/`.
+* Audio spectrum ingestion endpoints exist for Python-fed live visualization, but full
+  privacy-preserving peep detection is still planned. It should run as local audio feature
+  extraction in the Python edge service, not as server-side raw audio processing.
 
 Current intentional shortcuts:
 
 * Auth is a temporary token gate, not magic-link auth.
-* Persistence is local JSON-backed state under `tmp/`, not Postgres/Supabase.
-* The Python worker is a local process, not a server.
+* Persistence is local JSON-backed state under `tmp/`, not the target database and bucket storage.
+* The Python edge service currently runs as a local process, not a full media server.
 * The Python worker can capture webcam frames with OpenCV, but currently uses a fake detector scaffold instead of Falcon-Perception.
-* Video is snapshot-based. There is no full video streaming infrastructure.
+* Video is currently snapshot-based. The target architecture includes direct video stream/upload to
+  the webserver plus the parallel annotation pipeline.
 * The app is not production-hardened; the priority is an end-to-end weekend loop.
 
-## 1.2 Product owner implementation decisions
+## 1.3 Product owner implementation decisions
 
 These decisions supersede the heavier production recommendations elsewhere in this PRD for the
 current weekend build:
@@ -46,12 +112,39 @@ current weekend build:
 * Prioritize getting the full loop working end to end over production features.
 * Use file/in-memory storage first instead of Supabase/Postgres.
 * Use a simple temporary password/token admin gate instead of magic-link auth.
-* Build a practical local Python worker scaffold now: webcam capture, fake/manual detector, annotation, and push client.
+* Build a practical edge Python service scaffold now: webcam capture, fake/manual detector,
+  annotation, and push client.
+* Add peep tracking as a local privacy-preserving audio feature extractor: webcam/laptop mic input,
+  band-limited chick peep detection, event counts/intensity/coarse spectra, human-voice suppression,
+  and no raw or speech-reconstructable audio upload.
 * Treat Falcon-Perception as a fast follow after webcam-to-Remix is working.
-* Keep the local worker as a process that pushes observations to Remix, not as a separate Python web server.
+* Keep the edge worker/service able to push observations to Remix even before a richer Python media
+  server exists.
 * Use BAML/Kimi as the intended chat stack, with Fireworks Kimi configured through `FIREWORKS_API_KEY`.
 * Use `accounts/fireworks/models/kimi-k2p6` as the default Kimi model.
 * Keep conservative fallback behavior for chat and detection so the demo works even when model setup is incomplete.
+
+## 1.4 Long-term product direction
+
+BroodCast should evolve from a single-brooder demo into a family-owned observation and model
+training system.
+
+Core long-term assumptions:
+
+* A family may have multiple active chicken locations.
+* Each location has its own zones, camera history, named chickens, lighting patterns, background
+  objects, and behavior baselines.
+* Cameras are replaceable and unstable. A camera view is an input stream attached to a location for
+  a time range, not the canonical identity of the location.
+* Named chickens are user-owned entities. Their identities may be uncertain in video and should be
+  represented with confidence, not forced into false precision.
+* Video may be streamed or uploaded to the configured webserver for live viewing and storage, but
+  training/export/frontier-LLM use remains explicit and scoped. Raw audio stays local; only
+  voice-suppressed, non-reconstructable peep-derived data may leave the edge device.
+* Statistics must be tied to the model, calibration, camera, and location context that produced
+  them so future model upgrades do not silently rewrite historical meaning.
+* The system should improve through online, per-location training loops instead of assuming one
+  global model will perform well in every coop.
 
 ---
 
@@ -65,12 +158,30 @@ Build a working public web app this weekend where parents, kids, and classmates 
 2. See simple comfort/activity stats.
 3. Ask a chatbot questions about what the chicks are doing.
 4. Generate a simple “weekend chick care report.”
+5. See chick peep activity over time without streaming household audio or human voices.
 
 ## Secondary goal
 
 Create a reusable **Robosteading / Null Robot / Divot-style** pattern:
 
 > Observe a real-world activity → annotate it → explain it → coach the human → produce a useful report.
+
+## Long-term goal
+
+Create a local-first learning system that can produce stable, high-F1 chicken-care statistics for a
+specific family's locations over time:
+
+1. Segment chicks, feeders, drinkers, bedding, heat zones, doors, and other relevant objects.
+2. Track behavior statistics such as percent time feeding, percent time drinking, movement volume,
+   occupancy heatmaps, and pooping events.
+3. Track audio-derived signals such as peeping frequency by time of day, temperature, and location
+   context without uploading raw audio.
+4. Detect outliers such as escaped chickens, predator or pet intrusion, camera displacement,
+   abnormal inactivity, crowding, or a fallen camera.
+5. Track human-care context such as hands in the brooder, people present, cleaning events, bedding
+   changes, food/water refills, and direct checks without identifying people.
+6. Use human corrections and selected frontier-LLM annotations to continuously improve local models
+   for each location.
 
 ## Non-goals
 
@@ -82,10 +193,13 @@ Do **not** build:
 * Any actuator inside the brooder.
 * Veterinary diagnosis.
 * High-accuracy individual chick identity tracking.
-* Full production-grade video streaming infrastructure.
+* Overbuilt production-grade broadcast infrastructure before the direct video stream/upload path is
+  working.
 * A complex multi-agent orchestration system.
 * Native mobile apps.
-* Long-term animal-care platform.
+* Indiscriminate raw video surveillance or any raw audio surveillance.
+* A centralized model that requires all household media to be uploaded.
+* Fully autonomous decisions about animal care.
 
 ---
 
@@ -115,6 +229,38 @@ This is practical household/farm automation for care, learning, and gentle stewa
 
 The app should help humans become more attentive caregivers, not replace them.
 
+## 3.4 Local-first learning principle
+
+Raw media is sensitive household data. Video may be streamed or uploaded to the configured
+webserver for live viewing and bucket-backed storage, but it should remain governed by explicit
+location, retention, and training-use policy. Audio buffers and microphone-derived features that
+could reconstruct speech must remain on the edge device.
+
+The webserver should receive allowed video/media, structured observations, derived metrics,
+annotated frames, human annotations, and model metadata. Sending selected raw frames or short clips
+to a frontier vision LLM is allowed only as an explicit training, labeling, or audit action. Audio
+uploads are limited to voice-suppressed, non-reconstructable peep events, aggregate metrics, and
+coarse spectra.
+
+## 3.5 Location-first modeling principle
+
+A location is more stable than a camera. Statistics, zones, and model baselines should be organized
+around brooders, coops, runs, and other named places where chickens live.
+
+Camera records should include calibration, view geometry, active time range, and health status. If a
+camera moves or falls, the system should detect the shift, mark downstream observations as degraded,
+and avoid blending incompatible statistics.
+
+## 3.6 Human-in-the-loop training principle
+
+The system should treat model output as a hypothesis until it has enough location-specific evidence.
+
+Human annotations from the website are first-class training data. Frontier LLM vision annotations
+can help bootstrap labels, explain uncertain clips, and audit model errors, but they should not
+replace caregiver review for safety-relevant labels. Training should prioritize high-value examples:
+low confidence frames, model disagreements, new camera angles, unusual events, edge cases, and
+examples that affect reported statistics.
+
 ---
 
 # 4. Target users
@@ -123,7 +269,7 @@ The app should help humans become more attentive caregivers, not replace them.
 
 ### Parent/admin
 
-The parent sets up the camera, starts the local worker, checks observations, and manages the public live page.
+The parent sets up the camera, starts the edge service, checks observations, and manages the public live page.
 
 Needs:
 
@@ -166,6 +312,7 @@ Needs:
 3. As a visitor, I can see a comfort score and recent activity summary.
 4. As a visitor, I can ask, “Are the chicks too cold?” and receive a grounded answer based on recent observations.
 5. As a visitor, I can ask, “What are they doing right now?” and receive a plain-language explanation.
+6. As a visitor, I can see recent peep activity as event counts or trend labels, not as playable audio.
 
 ## Admin
 
@@ -175,6 +322,11 @@ Needs:
 4. As an admin, I can configure or edit brooder zones.
 5. As an admin, I can generate a report for the class.
 6. As an admin, I can pause public visibility if needed.
+7. As an admin, I can see a privacy status confirming that peep tracking uploads only derived events, not raw microphone audio.
+8. As an admin, I can create named locations such as "garage brooder" or "main coop."
+9. As an admin, I can attach a camera to a location and recalibrate zones when the camera moves.
+10. As an admin, I can name chickens and correct uncertain identity labels without requiring the
+    system to be certain on every frame.
 
 ## Local system operator
 
@@ -182,7 +334,24 @@ Needs:
 2. The worker captures frames every 2–5 seconds.
 3. The worker runs Falcon-Perception locally against snapshots.
 4. The worker sends observation JSON and latest annotated frames to the deployed app.
-5. If inference fails, the app still shows the last known frame and a stale-data warning.
+5. The worker samples the local microphone, filters for likely chick peep frequencies, and sends only timestamped peep events or aggregate peep stats.
+6. If inference or audio detection fails, the app still shows the last known frame and a stale-data warning.
+7. The worker can detect when the camera view has changed enough to require recalibration.
+8. The worker can keep raw media local while exporting selected examples for labeling or training.
+
+## Annotation and training operator
+
+1. As an admin, I can review uncertain frames, clips, masks, behavior labels, and anomaly candidates.
+2. As an admin, I can correct segmentation masks, bounding boxes, zones, named chicken identity,
+   behavior labels, and anomaly labels.
+3. As an admin, I can annotate cleaning events, bedding changes, food refills, water refills, and
+   direct human checks with start/end times and affected zones.
+4. As an admin, I can label hands and people as care-context objects without identifying the person.
+5. As an admin, I can approve a selected frame or short clip for frontier-LLM annotation.
+6. As an admin, I can see whether an annotation came from a human, a local model, or a frontier LLM.
+7. As an admin, I can export a per-location training manifest for the local inference worker.
+8. As an admin, I can compare a candidate model against the current model before promoting it.
+9. As an admin, I can see which model version produced each reported statistic.
 
 ---
 
@@ -196,6 +365,7 @@ Needs:
 * Chick annotations.
 * Chick zone labels.
 * Comfort score.
+* Peep activity trend.
 * Recent stats.
 * Chatbot panel: “Ask BroodCast.”
 
@@ -228,16 +398,22 @@ Needs:
 
 ### Local vision worker
 
-* Captures webcam frames.
+* Runs as the edge Python capture/inference service.
+* Captures webcam frames from at least one camera.
+* Streams/uploads allowed video/media directly to the webserver.
 * Runs Falcon-Perception on snapshots.
 * Detects chicks using prompt-based segmentation/detection.
 * Computes centroid, zone, confidence, basic movement.
-* Pushes observations to deployed API.
+* Detects peep events from local microphone frequency features after voice suppression and without
+  uploading raw or speech-reconstructable audio.
+* Pushes annotated frames, structured annotations, metrics, outliers, and peep-derived signals to
+  the configured webserver API.
 
 ### Report page
 
 * Summary of weekend observations.
 * Comfort score timeline.
+* Peep activity timeline.
 * Zone occupancy summary.
 * Manual care notes.
 * Kid-friendly “what we learned” section.
@@ -259,14 +435,72 @@ The system must never:
 * Replace adult supervision.
 * Make veterinary diagnoses.
 * Recommend risky interventions.
+* Stream, store, or expose raw microphone audio.
+* Store voice clips, speech transcripts, speaker identity, or other human-voice-derived content.
 
-## 7.2 Required safety banner
+## 7.2 Audio privacy constraints
+
+Peep tracking must be privacy-preserving by design.
+
+Required behavior:
+
+* Microphone processing runs locally in `services/inference/`.
+* The worker applies voice suppression plus a band-pass filter and event detector tuned for chick
+  peeps before upload.
+* The API receives only derived values such as peep count, peep rate, dominant frequency bucket,
+  peak level bucket, confidence, local timestamp, and coarse non-reconstructable spectra for live
+  display.
+* The worker must discard raw audio buffers after local analysis.
+* The web app must not provide audio playback, raw waveform display, speech transcription, or
+  downloadable audio.
+* Spoken language must not be extractable from any uploaded peep event, metric, spectrum, or
+  derived audio representation.
+* Peep data should be labeled as an approximate behavioral signal, not a diagnosis.
+
+Out of scope:
+
+* Identifying human speakers.
+* Identifying people by face, voice, gait, clothing, or biometric features.
+* Storing face embeddings or person re-identification embeddings.
+* Recording room audio.
+* Streaming live raw audio or any representation that can reconstruct human speech.
+* Classifying human speech content.
+
+## 7.3 Video privacy and training constraints
+
+Video may be streamed or uploaded from the edge device to the webserver for live viewing and
+bucket-backed storage. Training use should still be consented, scoped, and model-versioned.
+
+Required behavior:
+
+* The edge service may process raw frames and clips locally for realtime inference, heatmaps,
+  tracking, anomaly detection, and training-data selection.
+* The web app should ingest direct video/media streams or uploads, structured observations, derived
+  metrics, annotation metadata, model metadata, and annotated frames.
+* Raw clips or high-resolution source frames may be persisted to bucket storage according to the
+  configured live-view/storage policy. Sending selected media to a frontier vision LLM must remain
+  an explicit annotation, training, audit, or support action.
+* Training exports must record consent/source state, location, camera, timestamp, annotation source,
+  and model version.
+* Public pages must never expose private raw clips by default.
+* If a camera falls, moves, or loses the expected view, observations from that period should be
+  marked degraded and excluded from stable care statistics unless reviewed.
+
+Out of scope:
+
+* Always-on remote video recording.
+* Uploading all camera footage for centralized training.
+* Treating frontier-LLM annotations as automatically verified ground truth.
+* Using people or hand detections to identify a specific person.
+* Exposing person imagery or face crops publicly by default.
+
+## 7.4 Required safety banner
 
 Display on `/live` and `/dashboard`:
 
 > BroodCast is an observational learning tool. It does not replace adult supervision. Always directly check food, water, temperature, bedding, and chick behavior.
 
-## 7.3 Required agent behavior
+## 7.5 Required agent behavior
 
 The chatbot must always treat concerning situations conservatively.
 
@@ -283,8 +517,10 @@ Set `safety_level = "adult_attention"` when the user asks about or the observati
 * Trouble breathing.
 * Pasting/pasty butt.
 * Chick stuck, trapped, or separated.
+* Unusual peep patterns, such as sustained high peep rate, sudden silence after active periods, or
+  peep activity that conflicts with the visual comfort signal.
 
-## 7.4 Required physical setup rules
+## 7.6 Required physical setup rules
 
 Create `docs/SAFETY.md` with:
 
@@ -305,23 +541,45 @@ Create `docs/SAFETY.md` with:
 
 # 8. System architecture
 
+The architecture has three runtime layers:
+
+* **Edge device:** a Python capture/inference service on a local laptop, phone, Mac mini, small
+  desktop, or similar device connected to at least one webcam and optional microphones.
+* **Webserver:** the Remix app and ingestion APIs running locally, elsewhere on the local network,
+  or on a cloud host such as Fly.io.
+* **Persistence:** S3-compatible bucket storage for images/video and a database for observations,
+  annotations, peep metrics, outliers, model metadata, and chat-agent query context.
+
+Weekend MVP still starts with one edge device, one location, snapshot observations, manual zones,
+and simple reports. The target architecture adds direct video stream/upload, bucket-backed media,
+database-backed statistics, annotation queues, training manifests, model registry, and
+model-versioned behavior history.
+
 ```mermaid
 flowchart LR
-  subgraph Local["Local Laptop"]
+  subgraph Edge["Edge Device: Laptop / Phone / Mac mini"]
     Webcam[USB Webcam]
-    Capture[Frame Capture Worker]
+    Mic[Optional Microphones]
+    Capture[Video Capture + Stream Uploader]
     Falcon[Falcon-Perception Inference]
+    Realtime[Local Realtime Segmentation + Tracking]
+    Outlier[Local Outlier Detection]
     Analyzer[Zone + Activity Analyzer]
+    Audio[Peep Detection + Voice Suppression]
     Annotator[Frame Annotator]
+    LocalDataset[(Local Media + Training Cache)]
   end
 
-  subgraph Cloud["Fly.io"]
+  subgraph Web["Webserver: Local / LAN / Fly.io"]
     Remix[Remix 3 App]
     API[Resource/API Routes]
-    DB[(Postgres)]
-    Storage[(Frame Storage)]
+    DB[(Database)]
+    Storage[(S3-Compatible Bucket)]
+    Queue[Annotation Queue]
+    Registry[Model Registry + Metrics]
     BAML[BAML Agent Layer]
     Kimi[Kimi K2.5]
+    VisionLLM[Frontier Vision LLM]
   end
 
   subgraph Users["Users"]
@@ -330,13 +588,26 @@ flowchart LR
   end
 
   Webcam --> Capture
+  Mic --> Audio
+  Capture --> Storage
   Capture --> Falcon
-  Falcon --> Analyzer
+  Capture --> LocalDataset
+  Falcon --> Realtime
+  Realtime --> Analyzer
+  Realtime --> Outlier
+  Outlier --> Analyzer
+  Audio --> Analyzer
   Analyzer --> Annotator
   Annotator --> API
   Analyzer --> API
+  Audio --> API
+  LocalDataset -. selected examples only .-> Queue
   API --> DB
   API --> Storage
+  API --> Queue
+  Queue --> VisionLLM
+  Queue --> Registry
+  Registry --> API
   Remix --> API
   Remix --> BAML
   BAML --> Kimi
@@ -345,23 +616,61 @@ flowchart LR
   Admin --> Remix
 ```
 
+Local realtime inference should optimize for latency and consistency. Direct video upload/streaming
+is separate from the parallel annotation path so the live viewer can work even while segmentation
+or outlier analysis is delayed. Frontier LLM vision should optimize for label quality on selected
+examples, not for every-frame streaming inference. Audio leaving the edge device must be
+peep-filtered, voice-suppressed, and non-reconstructable as spoken language.
+
+## 8.1 Core long-term entities
+
+* `family`: the account that owns locations, cameras, chickens, annotations, and models.
+* `location`: a named physical place where chickens are observed, such as a brooder, coop, run, or
+  quarantine pen.
+* `camera`: a physical or logical camera stream that may be attached to different locations over
+  time.
+* `camera_attachment`: a time-bounded relationship between a camera and a location, including
+  calibration, zones, expected view embedding, and health state.
+* `chicken`: a named bird owned by the family, with optional identity evidence and confidence over
+  time.
+* `observation`: structured local model output for a timestamp, location, camera, and model version.
+* `object_detection`: a per-frame object hypothesis such as chick, hand, person, feeder, drinker,
+  bedding, egg, door, tool, predator, pet, or unknown object.
+* `scene_event`: a temporal event inferred from one or more observations, such as cleaning, bedding
+  change, food refill, water refill, direct check, chicken feeding, chicken drinking, pooping,
+  escape, intrusion, or camera moved.
+* `annotation`: human, local-model, or frontier-LLM label data tied to media, observation, and
+  source.
+* `training_example`: selected frame, clip, mask, label set, or audio-derived event used for
+  training/evaluation.
+* `model_version`: a local or shared model artifact with metrics, training data lineage, and
+  deployment status.
+
 ---
 
 # 9. Deployment architecture
 
-## 9.1 Local laptop
+## 9.1 Edge device
 
 Runs:
 
-* Webcam capture.
+* Webcam capture from at least one camera.
+* Optional microphone capture.
+* Direct video stream/upload client to the webserver.
+* Local microphone peep-event detection with human-voice suppression.
 * Falcon-Perception inference.
 * Zone/activity analyzer.
+* Outlier extraction.
 * Frame annotation.
-* Push client to Fly.io.
+* Push client to the configured webserver URL.
 
-Reason: GPU/CPU-heavy vision inference should remain local for weekend MVP.
+The edge device may be a laptop, phone, Mac mini, small desktop, or similar device near the animals.
+Reason: GPU/CPU-heavy vision/audio inference should run near the cameras and microphones, and
+microphone audio must be filtered locally for privacy. Only derived peep events, coarse spectra,
+aggregate peep metrics, annotated frames, video/media allowed by configuration, and structured
+observation payloads are sent to the webserver.
 
-## 9.2 Fly.io
+## 9.2 Webserver
 
 Runs:
 
@@ -369,10 +678,15 @@ Runs:
 * API routes.
 * Auth/session handling.
 * Chat route.
-* Postgres connection.
-* Frame upload/read endpoints.
+* Database connection.
+* S3-compatible bucket storage integration.
+* Image/video upload and read endpoints.
+* Query endpoints for chat agents and UI statistics.
 
-## 9.3 Storage
+The webserver can run on the same edge device, another computer on the local network, or a cloud
+host such as Fly.io. It must not assume it has direct access to cameras or microphones.
+
+## 9.3 Storage and database
 
 Original production-oriented options:
 
@@ -397,10 +711,14 @@ Original recommended weekend path: **Supabase + Fly.io Remix app**.
 
 Current selected path: **local JSON-backed file/in-memory storage + Remix app**.
 
+Target production path: **S3-compatible bucket storage for images/video plus a database for
+observations, annotations, metrics, outliers, calibration, model versions, chat-agent context, and
+behavior history**.
+
 Reason: the immediate priority is proving the product loop:
 
 ```text
-webcam snapshot → local worker analysis → Remix ingest → live view → chat explanation → report
+edge webcam capture → direct video stream/upload + parallel annotation → Remix ingest → live view → chat explanation → report
 ```
 
 Supabase/Postgres can replace the local store after the loop is working.
@@ -461,6 +779,7 @@ Components:
 * Authenticated layout.
 * Current observation.
 * Recent observation table.
+* Peep activity chart and privacy status.
 * Manual note form.
 * Zone config editor.
 * Stream health card.
@@ -475,6 +794,7 @@ Shows:
 * Date/time range.
 * Total observations.
 * Average comfort score.
+* Peep activity timeline.
 * Zone distribution.
 * Notable events.
 * Manual notes.
@@ -502,7 +822,7 @@ Current weekend implementation: not used because admin access is a temporary tok
 
 ## 11.1 `POST /api/ingest/observation`
 
-Used by local laptop worker.
+Used by the edge Python capture/inference service.
 
 Auth:
 
@@ -512,9 +832,17 @@ Input:
 
 ```json
 {
+  "family_id": "family_local_dev",
+  "location_id": "garage_brooder",
+  "camera_id": "laptop_webcam_1",
+  "camera_attachment_id": "garage_brooder_laptop_webcam_2026_05",
+  "model_version_id": "local-yolo-rfdetr-2026-05-16",
+  "calibration_version": "zones-2026-05-16-a",
   "timestamp": "2026-05-16T10:15:00Z",
   "frame_id": "frame_000123.jpg",
   "annotated_frame_url": "https://...",
+  "raw_media_uploaded": false,
+  "view_health": "ok",
   "comfort_score": 4,
   "summary": "Two chicks detected. One near heater, one on turf.",
   "alerts": [],
@@ -522,19 +850,86 @@ Input:
     "chick_count": 2,
     "heater_zone_pct_10m": 0.42,
     "food_water_zone_pct_10m": 0.18,
-    "movement_score": 0.31
+    "movement_score": 0.31,
+    "feeding_time_pct_10m": 0.12,
+    "drinking_time_pct_10m": 0.04,
+    "poop_events_10m": 1,
+    "occupancy_heatmap_id": "heatmap_000123",
+    "peep_count_10m": 38,
+    "peep_rate_per_minute": 3.8,
+    "peep_intensity": "moderate",
+    "peep_trend": "steady"
+  },
+  "objects": [
+    {
+      "track_id": "hand_1",
+      "class": "hand",
+      "zone": "food_water",
+      "bbox": [80, 610, 230, 760],
+      "mask_ref": "local_or_uploaded_mask_id",
+      "confidence": 0.88,
+      "privacy": {
+        "biometric_identity_allowed": false,
+        "publicly_visible": false
+      }
+    },
+    {
+      "track_id": "person_1",
+      "class": "person",
+      "zone": "outside_brooder",
+      "bbox": [0, 120, 180, 720],
+      "confidence": 0.74,
+      "privacy": {
+        "biometric_identity_allowed": false,
+        "publicly_visible": false
+      }
+    }
+  ],
+  "events": [
+    {
+      "event_type": "cleaning",
+      "started_at": "2026-05-16T10:13:40Z",
+      "ended_at": "2026-05-16T10:15:00Z",
+      "zone": "food_water",
+      "actor_type": "human",
+      "evidence_object_track_ids": ["hand_1"],
+      "confidence": 0.71,
+      "review_state": "needs_review"
+    }
+  ],
+  "audio": {
+    "source": "local_mic_frequency_filter",
+    "raw_audio_uploaded": false,
+    "human_voice_uploaded": false,
+    "window_seconds": 60,
+    "sample_rate_hz": 16000,
+    "filter_band_hz": [1800, 6500],
+    "events": [
+      {
+        "timestamp": "2026-05-16T10:14:42Z",
+        "duration_ms": 180,
+        "dominant_frequency_hz": 3400,
+        "peak_level_dbfs": -28,
+        "confidence": 0.76
+      }
+    ]
   },
   "detections": [
     {
       "track_id": "chick_1",
+      "chicken_id": "henrietta",
+      "identity_confidence": 0.64,
       "zone": "heater",
       "bbox": [420, 300, 510, 390],
       "centroid": [465, 345],
       "activity": "resting",
+      "mask_ref": "local_or_uploaded_mask_id",
       "confidence": 0.82
     },
     {
       "track_id": "chick_2",
+      "chicken_id": null,
+      "identity_confidence": 0.22,
       "zone": "turf",
       "bbox": [610, 350, 700, 440],
       "centroid": [655, 395],
@@ -562,7 +957,38 @@ Returns latest observation.
 
 Returns recent observations.
 
-## 11.4 `POST /api/chat`
+## 11.4 `GET /api/peeps?minutes=60`
+
+Returns recent peep activity derived from ingested observation stats.
+
+Output:
+
+```json
+{
+  "minutes": 60,
+  "raw_audio_available": false,
+  "events": [
+    {
+      "timestamp": "2026-05-16T10:14:42Z",
+      "duration_ms": 180,
+      "dominant_frequency_hz": 3400,
+      "peak_level_dbfs": -28,
+      "confidence": 0.76
+    }
+  ],
+  "buckets": [
+    {
+      "start": "2026-05-16T10:10:00Z",
+      "end": "2026-05-16T10:15:00Z",
+      "peep_count": 18,
+      "peep_rate_per_minute": 3.6,
+      "peep_intensity": "moderate"
+    }
+  ]
+}
+```
+
+## 11.5 `POST /api/chat`
 
 Input:
 
@@ -595,7 +1021,7 @@ Output:
 }
 ```
 
-## 11.5 `POST /api/manual-notes`
+## 11.6 `POST /api/manual-notes`
 
 Admin-only.
 
@@ -608,7 +1034,7 @@ Input:
 }
 ```
 
-## 11.6 `GET /api/report?date=YYYY-MM-DD`
+## 11.7 `GET /api/report?date=YYYY-MM-DD`
 
 Returns report data.
 
@@ -626,27 +1052,212 @@ create table users (
   created_at timestamptz default now()
 );
 
+create table families (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz default now()
+);
+
+create table locations (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references families(id) on delete cascade,
+  name text not null,
+  kind text not null default 'brooder',
+  active boolean not null default true,
+  metadata jsonb not null default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table cameras (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references families(id) on delete cascade,
+  name text not null,
+  device_fingerprint text,
+  active boolean not null default true,
+  metadata jsonb not null default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table camera_attachments (
+  id uuid primary key default gen_random_uuid(),
+  camera_id uuid not null references cameras(id) on delete cascade,
+  location_id uuid not null references locations(id) on delete cascade,
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  calibration_version text,
+  expected_view jsonb not null default '{}',
+  view_health text not null default 'unknown',
+  metadata jsonb not null default '{}'
+);
+
+create table chickens (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references families(id) on delete cascade,
+  name text not null,
+  active boolean not null default true,
+  identity_notes text,
+  metadata jsonb not null default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table model_versions (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid references families(id) on delete cascade,
+  location_id uuid references locations(id) on delete set null,
+  name text not null,
+  model_type text not null,
+  artifact_uri text,
+  training_manifest_uri text,
+  metrics jsonb not null default '{}',
+  status text not null default 'candidate',
+  created_at timestamptz default now(),
+  promoted_at timestamptz
+);
+
 create table chick_observations (
   id uuid primary key default gen_random_uuid(),
+  family_id uuid references families(id) on delete cascade,
+  location_id uuid references locations(id) on delete set null,
+  camera_id uuid references cameras(id) on delete set null,
+  camera_attachment_id uuid references camera_attachments(id) on delete set null,
+  model_version_id uuid references model_versions(id) on delete set null,
   created_at timestamptz default now(),
   observed_at timestamptz not null,
   frame_id text,
   annotated_frame_url text,
+  raw_media_uploaded boolean not null default false,
+  view_health text not null default 'unknown',
+  calibration_version text,
   comfort_score int,
   summary text,
   alerts jsonb not null default '[]',
   stats jsonb not null default '{}'
 );
 
+create table chick_peep_events (
+  id uuid primary key default gen_random_uuid(),
+  observation_id uuid references chick_observations(id) on delete cascade,
+  observed_at timestamptz not null,
+  duration_ms int,
+  dominant_frequency_hz int,
+  peak_level_dbfs numeric,
+  confidence numeric,
+  metadata jsonb not null default '{}',
+  created_at timestamptz default now()
+);
+
 create table chick_detections (
   id uuid primary key default gen_random_uuid(),
   observation_id uuid not null references chick_observations(id) on delete cascade,
   track_id text,
+  chicken_id uuid references chickens(id) on delete set null,
+  identity_confidence numeric,
   zone text,
   bbox jsonb,
+  mask_ref text,
   centroid jsonb,
   activity text,
   confidence numeric,
+  created_at timestamptz default now()
+);
+
+create table object_detections (
+  id uuid primary key default gen_random_uuid(),
+  observation_id uuid not null references chick_observations(id) on delete cascade,
+  family_id uuid references families(id) on delete cascade,
+  location_id uuid references locations(id) on delete set null,
+  camera_id uuid references cameras(id) on delete set null,
+  camera_attachment_id uuid references camera_attachments(id) on delete set null,
+  model_version_id uuid references model_versions(id) on delete set null,
+  observed_at timestamptz not null,
+  track_id text,
+  object_class text not null,
+  object_role text,
+  zone text,
+  bbox jsonb,
+  mask_ref text,
+  centroid jsonb,
+  confidence numeric,
+  is_privacy_sensitive boolean not null default false,
+  public_visibility text not null default 'private',
+  metadata jsonb not null default '{}',
+  created_at timestamptz default now()
+);
+
+create table scene_events (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid references families(id) on delete cascade,
+  location_id uuid references locations(id) on delete set null,
+  camera_id uuid references cameras(id) on delete set null,
+  camera_attachment_id uuid references camera_attachments(id) on delete set null,
+  model_version_id uuid references model_versions(id) on delete set null,
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  event_type text not null,
+  actor_type text,
+  subject_chicken_id uuid references chickens(id) on delete set null,
+  zone text,
+  confidence numeric,
+  source text not null,
+  created_by_user_id uuid references users(id) on delete set null,
+  review_state text not null default 'unreviewed',
+  evidence jsonb not null default '{}',
+  metadata jsonb not null default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table scene_event_observations (
+  event_id uuid not null references scene_events(id) on delete cascade,
+  observation_id uuid not null references chick_observations(id) on delete cascade,
+  primary key (event_id, observation_id)
+);
+
+create table scene_event_objects (
+  event_id uuid not null references scene_events(id) on delete cascade,
+  object_detection_id uuid not null references object_detections(id) on delete cascade,
+  relationship text not null default 'evidence',
+  primary key (event_id, object_detection_id)
+);
+
+create table annotations (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid references families(id) on delete cascade,
+  location_id uuid references locations(id) on delete set null,
+  camera_id uuid references cameras(id) on delete set null,
+  observation_id uuid references chick_observations(id) on delete set null,
+  object_detection_id uuid references object_detections(id) on delete set null,
+  scene_event_id uuid references scene_events(id) on delete set null,
+  media_ref text,
+  target_type text not null default 'media',
+  started_at timestamptz,
+  ended_at timestamptz,
+  geometry jsonb,
+  label_type text not null,
+  label jsonb not null,
+  source text not null,
+  source_model_version_id uuid references model_versions(id) on delete set null,
+  reviewer_user_id uuid references users(id) on delete set null,
+  confidence numeric,
+  consent_state text not null default 'local_only',
+  created_at timestamptz default now()
+);
+
+create table training_examples (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid references families(id) on delete cascade,
+  location_id uuid references locations(id) on delete set null,
+  camera_id uuid references cameras(id) on delete set null,
+  observation_id uuid references chick_observations(id) on delete set null,
+  media_ref text not null,
+  manifest_ref text,
+  label_summary jsonb not null default '{}',
+  selection_reason text,
+  consent_state text not null default 'local_only',
+  split text,
   created_at timestamptz default now()
 );
 
@@ -654,6 +1265,7 @@ create table manual_notes (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz default now(),
   user_id uuid,
+  scene_event_id uuid references scene_events(id) on delete set null,
   note text not null,
   visibility text not null default 'private'
 );
@@ -677,6 +1289,9 @@ create table chat_messages (
 
 create table brooder_zones (
   id uuid primary key default gen_random_uuid(),
+  location_id uuid references locations(id) on delete cascade,
+  camera_attachment_id uuid references camera_attachments(id) on delete set null,
+  calibration_version text,
   name text not null,
   polygon jsonb not null,
   color text,
@@ -684,6 +1299,58 @@ create table brooder_zones (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+```
+
+Data model notes:
+
+* Keep `chick_detections` for chick-specific identity, behavior, and reporting convenience.
+* Use `object_detections` for the general vision vocabulary: `chick`, `hand`, `person`, `feeder`,
+  `drinker`, `bedding`, `door`, `tool`, `egg`, `pet`, `predator`, `waste`, and `unknown_object`.
+* Hands and people are privacy-sensitive object classes. They may support care-context events, but
+  they must not be used for biometric identity or public person tracking.
+* Use `scene_events` for temporal facts that may span many frames: `cleaning`, `bedding_change`,
+  `food_refill`, `water_refill`, `direct_check`, `feeding_visit`, `drinking_visit`, `poop`,
+  `escape`, `intrusion`, `camera_moved`, `camera_blocked`, and `camera_fallen`.
+* Cleaning is not just a note. It should be annotatable and learnable as an event with start/end
+  time, location zone, evidence object detections, review state, and optional manual note linkage.
+* `annotations.target_type` should identify whether the label applies to media, an observation, an
+  object detection, a scene event, a zone, a track, or a named chicken identity.
+* `annotations.geometry` should hold the user-edited box, polygon, point, mask reference, or zone
+  geometry when the annotation is spatial.
+* `annotations.started_at` and `annotations.ended_at` should hold the user-edited time range when
+  the annotation is temporal.
+* `scene_event_objects` lets a cleaning event cite hands, tools, bedding, or feeder/drinker objects
+  as evidence without duplicating boxes and masks.
+
+Example annotation labels:
+
+```json
+{
+  "target_type": "object_detection",
+  "label_type": "object_class",
+  "geometry": { "type": "box", "bbox": [80, 610, 230, 760] },
+  "label": {
+    "class": "hand",
+    "is_privacy_sensitive": true,
+    "biometric_identity_allowed": false
+  }
+}
+```
+
+```json
+{
+  "target_type": "scene_event",
+  "label_type": "care_event",
+  "started_at": "2026-05-16T10:13:40Z",
+  "ended_at": "2026-05-16T10:15:00Z",
+  "label": {
+    "event_type": "cleaning",
+    "actor_type": "human",
+    "zone": "food_water",
+    "affected_objects": ["bedding", "drinker"],
+    "review_state": "reviewed"
+  }
+}
 ```
 
 ---
@@ -701,25 +1368,72 @@ services/inference/
   stream_client.py
   zones.json
   main.py
+  audio.py
   requirements.txt
 ```
 
 ## 13.2 Worker behavior
 
-Loop every 2–5 seconds:
+The edge service has three parallel responsibilities:
+
+1. Read video from at least one webcam and optional microphones.
+2. Stream or upload allowed video/media directly to the configured webserver for live viewing and
+   bucket-backed storage.
+3. Run local annotation/inference loops that produce structured observations for the webserver and
+   chat agents.
+
+Annotation loop every 2–5 seconds:
 
 1. Capture frame from webcam.
-2. Optionally crop to brooder area.
-3. Run Falcon-Perception with chick prompt.
-4. Get masks or bounding boxes.
-5. Compute centroid for each detection.
-6. Assign each centroid to a configured zone.
-7. Estimate activity based on movement between recent frames.
-8. Compute comfort score.
-9. Draw annotations on frame.
-10. Upload/push observation to Fly API.
+2. Sample a short microphone window locally if a microphone is configured.
+3. Optionally crop to brooder area.
+4. Run Falcon-Perception with chick prompt.
+5. Get masks or bounding boxes.
+6. Compute centroid for each detection.
+7. Assign each centroid to a configured zone.
+8. Estimate activity based on movement between recent frames.
+9. Detect chick peep events from local frequency features after voice suppression.
+10. Compute comfort score.
+11. Extract outliers such as missing chicks, crowding, camera movement, unusual inactivity, or
+    distress-like peep activity.
+12. Draw annotations on frame.
+13. Upload/push annotated frame, structured annotation payload, outlier metrics, and peep metrics to
+    the webserver API.
+14. Attach location, camera, camera attachment, calibration, and model version metadata to every
+    observation.
+14. Detect view shifts or camera failure and mark observations as degraded when calibration is no
+    longer trustworthy.
+15. Select uncertain or high-value examples for local annotation/training queues without uploading
+    raw media by default.
 
-## 13.3 Detection prompt
+## 13.3 Realtime model responsibilities
+
+The realtime local model path should optimize for stable statistics at household hardware speeds.
+It does not need frontier-model reasoning on every frame.
+
+Required outputs over time:
+
+* Chick instance segmentation or bounding boxes.
+* Privacy-sensitive hand and person detections for care context, without person identity.
+* Feeder, drinker, bedding, door, tool, waste, pet, predator, and unknown-object detections where
+  useful for behavior or anomaly statistics.
+* Track IDs with confidence and uncertainty.
+* Optional named chicken identity with confidence, never forced identity.
+* Zone occupancy.
+* Movement score and path traces.
+* Feeding and drinking visit candidates.
+* Poop event candidates.
+* Cleaning, bedding-change, food-refill, water-refill, and direct-check event candidates.
+* Occupancy heatmaps.
+* Peep event counts/rates from local audio features.
+* View health and camera displacement signals.
+* Anomaly candidates, such as escaped chicken, predator/pet intrusion, fallen camera, blocked
+  camera, abnormal inactivity, or abnormal crowding.
+
+All statistics should include enough metadata to trace them back to location, camera attachment,
+calibration, and model version.
+
+## 13.4 Detection prompt
 
 Start with:
 
@@ -735,9 +1449,9 @@ baby chicken
 small white bird
 ```
 
-## 13.4 Tracking
+## 13.5 Tracking
 
-Do not overbuild identity tracking.
+Do not overbuild identity tracking for the weekend MVP.
 
 Use nearest-centroid matching across frames:
 
@@ -754,7 +1468,11 @@ chick_2
 unknown_chick
 ```
 
-## 13.5 Activity classification
+Long term, tracking should separate temporary track IDs from named chicken identity. A named chicken
+match should carry confidence and evidence, and the UI should invite correction when identity is
+uncertain.
+
+## 13.6 Activity classification
 
 Simple heuristic:
 
@@ -764,7 +1482,7 @@ movement_delta between thresholds    => shifting
 movement_delta > threshold_high      => active
 ```
 
-## 13.6 Zone classification
+## 13.7 Zone classification
 
 Use polygon point-in-polygon.
 
@@ -793,7 +1511,7 @@ Zones:
 }
 ```
 
-## 13.7 Comfort score heuristic
+## 13.8 Comfort score heuristic
 
 Initial simple score:
 
@@ -811,6 +1529,99 @@ Clamp to 1–5.
 ```
 
 This is not a health score. Label it as **comfort signal**, not medical status.
+
+## 13.9 Peep event detection
+
+Initial implementation should be simple and inspectable.
+
+Pipeline:
+
+1. Read microphone frames locally from the laptop or webcam mic.
+2. Downsample or capture at 16 kHz where possible.
+3. Apply a band-pass filter for likely chick peep energy, initially around `1800-6500 Hz`.
+4. Compute short-time spectral energy windows, such as 20-50 ms windows.
+5. Detect peep candidates when band energy rises above the local noise floor and lasts for a short
+   chick-like duration.
+6. Merge adjacent candidates separated by very short gaps.
+7. Emit event metadata only: timestamp, duration, dominant frequency, peak level bucket/value, and
+   confidence.
+8. Aggregate events into rolling counts/rates for `stats`.
+9. Drop the raw audio buffer after processing.
+
+Do not send:
+
+* Raw PCM samples.
+* Encoded audio files.
+* Spectrogram images that could reconstruct speech.
+* Human speech transcripts or voice labels.
+
+First-pass heuristic:
+
+```text
+peep_event = band_energy(1800-6500 Hz) > adaptive_noise_floor + threshold
+             and duration between 40 ms and 700 ms
+             and low_frequency_voice_energy is not dominant
+```
+
+This detector will be imperfect. The product should present peep activity as "peep events detected"
+or "peep activity signal," not as exact vocalization counts.
+
+## 13.10 Peep comfort signal heuristic
+
+Peep data can adjust attention messaging, but it must not be treated as a medical diagnosis.
+
+Initial rules:
+
+```text
+steady low/moderate peep rate + normal visual behavior => informational
+sustained high peep rate for >5 minutes => suggest direct adult check
+sudden high peep rate + crowding near heater => possible cold/stress signal
+sudden high peep rate + chicks far from heater => possible overheating/discomfort signal
+sudden silence after recent high activity => mention uncertainty; check directly if concerned
+```
+
+The chatbot may cite peep trends as evidence only when the answer also reminds the user to directly
+check the brooder.
+
+## 13.11 Annotation and training loop
+
+Training should be continuous, explicit, and auditable.
+
+Loop:
+
+1. Local models produce observations, masks, tracks, behavior candidates, audio-derived events, and
+   anomaly candidates.
+2. The app queues examples that are uncertain, novel, user-relevant, safety-relevant, or statistically
+   influential.
+3. Humans correct labels in the web UI.
+4. Admins may approve selected examples for frontier-LLM vision annotation when local labels need
+   bootstrapping or audit.
+5. The system stores annotation source, confidence, reviewer, consent state, and model lineage.
+6. Training manifests are exported per family/location/camera attachment.
+7. Candidate local models are evaluated against held-out human-reviewed examples before promotion.
+8. Promoted models are versioned, and subsequent observations include the promoted model version.
+
+Training labels should cover:
+
+* Instance masks and boxes.
+* Chicken count.
+* Temporary tracks.
+* Named chicken identity.
+* Hands and people as privacy-sensitive care-context objects, without biometric identity labels.
+* Feeders, drinkers, bedding, tools, doors, waste, pets, predators, and unknown objects.
+* Zones and location context.
+* Feeding, drinking, resting, active, and other behavior labels.
+* Poop events.
+* Cleaning events, bedding changes, food refills, water refills, and direct checks.
+* Predator/pet/object intrusion.
+* Escape or missing-chicken events.
+* Camera moved, camera blocked, camera fallen, and poor-view events.
+* Audio-derived peep event correctness and false positives.
+
+Promotion criteria should include precision, recall, F1, calibration quality, false alert rate,
+stability of aggregate statistics, and performance on recent examples from the same location. A
+model that improves frame-level detection but destabilizes reported care statistics should not be
+promoted without review.
 
 ---
 
@@ -874,6 +1685,10 @@ class ChickObservation {
   heater_zone_pct_10m float
   food_water_zone_pct_10m float
   movement_score float
+  peep_count_10m int
+  peep_rate_per_minute float
+  peep_intensity "none" | "low" | "moderate" | "high"
+  peep_trend "unknown" | "rising" | "steady" | "falling"
 }
 
 class ChickAnswer {
@@ -903,6 +1718,7 @@ function AnswerChickQuestion(
     - Never claim to diagnose illness.
     - Never say the system replaces adult supervision.
     - Never tell users to change heat, food, water, or housing without checking conditions directly.
+    - Treat peep activity as an approximate local audio signal. Never imply that raw audio or human voices are available.
     - If the question involves danger, distress, injury, lethargy, overheating, dehydration, constant loud peeping, or a chick being trapped, set safety_level to adult_attention.
 
     Latest observation:
@@ -1034,6 +1850,8 @@ type ChickStatsCardsProps = {
   comfortScore: number | null;
   chickCount: number;
   movementScore: number | null;
+  peepRatePerMinute: number | null;
+  peepTrend: "unknown" | "rising" | "steady" | "falling";
   alerts: string[];
 };
 ```
@@ -1063,10 +1881,36 @@ Columns:
 * Time.
 * Chick count.
 * Comfort score.
+* Peep activity.
 * Summary.
 * Alerts.
 
-## 16.5 `ManualNoteForm`
+## 16.5 `PeepActivityChart`
+
+Shows recent peep events as a trend chart.
+
+Props:
+
+```ts
+type PeepActivityChartProps = {
+  rawAudioAvailable: false;
+  buckets: Array<{
+    start: string;
+    end: string;
+    peepCount: number;
+    peepRatePerMinute: number;
+    peepIntensity: "none" | "low" | "moderate" | "high";
+  }>;
+};
+```
+
+Behavior:
+
+* Shows event counts/rates over time.
+* Shows a privacy label such as "Local frequency detection only. No raw audio uploaded."
+* Does not include audio playback controls.
+
+## 16.6 `ManualNoteForm`
 
 Admin-only.
 
@@ -1076,7 +1920,7 @@ Fields:
 * Visibility: private/public.
 * Submit.
 
-## 16.6 `SafetyBanner`
+## 16.7 `SafetyBanner`
 
 Required on public and admin pages.
 
@@ -1116,6 +1960,7 @@ chickcoach-live/
           api.chat.ts
           api.latest.ts
           api.observations.ts
+          api.peeps.ts
           api.ingest.observation.ts
           api.manual-notes.ts
         styles/
@@ -1133,6 +1978,7 @@ chickcoach-live/
       capture.py
       falcon_segment.py
       analyze.py
+      audio.py
       annotate.py
       stream_client.py
       zones.json
@@ -1188,6 +2034,11 @@ STREAM_INGEST_TOKEN=
 CAMERA_INDEX=0
 CAPTURE_INTERVAL_SECONDS=3
 FALCON_MODEL=tiiuae/Falcon-Perception
+ENABLE_AUDIO_PEEPS=false
+MIC_DEVICE_INDEX=
+AUDIO_SAMPLE_RATE=16000
+PEEP_FILTER_LOW_HZ=1800
+PEEP_FILTER_HIGH_HZ=6500
 ```
 
 ---
@@ -1209,6 +2060,7 @@ FALCON_MODEL=tiiuae/Falcon-Perception
 ### Local worker
 
 * Capture webcam frame.
+* Prove microphone access locally without uploading audio.
 * Save latest frame locally.
 * Send fake observation to web app.
 * Verify `/live` updates.
@@ -1235,6 +2087,24 @@ Acceptance criteria:
 * App shows latest annotated chick image.
 * App shows chick count and zone labels.
 * Comfort score updates.
+
+---
+
+## Saturday midday: privacy-preserving peep signal
+
+* Add `services/inference/audio.py`.
+* Capture short microphone windows locally.
+* Implement band-pass peep candidate detection.
+* Emit only event metadata and aggregate stats.
+* Add peep stats to observation ingest.
+* Add peep activity display to `/live` and `/dashboard`.
+
+Acceptance criteria:
+
+* No raw audio files are created or uploaded by default.
+* API payloads contain `raw_audio_uploaded: false`.
+* Public UI shows peep activity over time without playback controls.
+* High sustained peep activity can be cited by chat as a reason to directly check the brooder.
 
 ---
 
@@ -1315,13 +2185,17 @@ The MVP is complete when:
 1. A public user can visit `/live`.
 2. The page shows a recent annotated image of the brooder.
 3. The page shows chick count, zone labels, and comfort score.
-4. A user can ask the chatbot a question.
-5. The chatbot answers using latest observation data.
-6. Admin can log in via magic link.
-7. Admin can add manual notes.
-8. A report page summarizes the weekend.
-9. Local worker can be stopped/restarted without breaking the app.
-10. The app displays a stale-data warning when updates stop.
+4. The page shows peep activity over time using derived event metrics only.
+5. A user can ask the chatbot a question.
+6. The chatbot answers using latest observation data.
+7. Admin can log in via magic link.
+8. Admin can add manual notes.
+9. A report page summarizes the weekend.
+10. Local worker can be stopped/restarted without breaking the app.
+11. The app displays a stale-data warning when updates stop.
+12. Observations include location, camera, calibration, and model-version metadata, even if the
+    weekend build uses default single-location values.
+13. The annotation UI can distinguish human labels from local model labels.
 
 ## Safety acceptance
 
@@ -1333,16 +2207,43 @@ The MVP is acceptable only if:
 4. The chatbot recommends direct adult checks for concerning scenarios.
 5. Public pages include an explicit supervision disclaimer.
 6. The system labels scores as “comfort signals,” not health status.
+7. Raw audio is not streamed, stored, played back, or exposed through APIs.
+8. Peep tracking uploads only frequency-derived events and aggregate stats.
+9. Raw video or high-resolution source frames are not uploaded for training without explicit admin
+   selection.
+10. Camera-displacement or poor-view periods are marked degraded before they feed stable statistics.
+
+## Training acceptance
+
+The long-term training loop is acceptable when:
+
+1. Every annotation records source: human, local model, frontier LLM, or imported dataset.
+2. Every training example records consent state and media locality.
+3. Every reported statistic can be traced to location, camera attachment, calibration, and model
+   version.
+4. Candidate models are evaluated on held-out human-reviewed examples before promotion.
+5. Promotion decisions consider aggregate statistic stability, not only frame-level detection score.
+6. Frontier LLM labeling is opt-in per selected example or batch, not an always-on streaming path.
+7. The system can recover from camera changes by requiring recalibration or excluding degraded
+   observations from stable reports.
 
 ---
 
 # 21. Engineering notes
 
-## 21.1 Do not stream full video first
+## 21.1 Separate video streaming from annotation
 
-Use snapshot-based near-live updates every 2–5 seconds.
+Video has a direct stream/upload path to the webserver for live viewing and bucket-backed storage.
+It also has a parallel annotation path that can run every 2-5 seconds or at another practical
+cadence.
 
-This is simpler, cheaper, easier to debug, and enough for chick monitoring.
+Keep these paths decoupled. The live video path should not block on segmentation, model inference,
+or chat-agent indexing. The annotation path should push annotated frames, structured detections,
+metrics, and outliers to the webserver/database when ready.
+
+Audio is different: do not stream raw microphone audio. Process it locally through peep detection
+and human-voice suppression, then upload only derived peep events, aggregate trends, and coarse
+spectral data from which spoken language is not extractable.
 
 ## 21.2 Do not overbuild identity
 
@@ -1350,11 +2251,26 @@ With two similar chicks, persistent identity may be unreliable.
 
 Use temporary track IDs based on nearest centroid.
 
+Long term, named chickens should be supported, but identity must remain probabilistic. Prefer
+`unknown_chick` or low-confidence identity over pretending the model knows which bird is which.
+
 ## 21.3 Do not block the UI on model calls
 
 The live view should update independently of chat.
 
-## 21.4 Do not put Codex in the runtime care loop
+## 21.4 Do not centralize raw media by default
+
+Local media is a training asset, but it is also sensitive household data. Build the training loop so
+local machines can keep raw clips and frames private while exporting annotations, manifests,
+derived metrics, and selected opt-in examples.
+
+## 21.5 Do not let model upgrades rewrite history
+
+Statistics should be reproducible. Store model version, calibration version, location, camera
+attachment, and view-health state with observations. If historical data is reprocessed, write a new
+derived-statistics version instead of silently replacing old values.
+
+## 21.6 Do not put Codex in the runtime care loop
 
 Codex can inspect logs and propose improvements, but it should not make care decisions.
 
@@ -1432,6 +2348,13 @@ Can you explain this for kids?
 | Chat overclaims                 |     Medium |   High | Strict BAML schema and safety prompt                   |
 | Public stream stale             |       High |    Low | Add stale warning                                      |
 | Similar chicks confuse tracking |       High |    Low | Do not promise stable identity                         |
+| Room audio privacy risk         |     Medium |   High | Local-only filtering; never upload raw audio           |
+| Peep detector false positives   |       High | Medium | Label as approximate; tune thresholds with admin view  |
+| Camera moves or falls           |       High | Medium | Track camera attachments; mark view health degraded    |
+| Off-the-shelf model underperforms |     High | Medium | HIL annotation plus per-location training manifests    |
+| Model upgrade shifts statistics |     Medium |   High | Version models/calibrations and compare aggregate drift |
+| Frontier LLM label mistakes     |     Medium | Medium | Treat as draft labels; require review for safety labels |
+| Raw media uploaded too broadly  |        Low |   High | Explicit admin selection and consent state per example |
 
 ---
 
@@ -1441,8 +2364,9 @@ If Falcon-Perception is too hard to run this weekend, ship the app with:
 
 1. Webcam snapshots.
 2. Manual chick annotations.
-3. Zone stats entered manually.
-4. Chatbot using manual notes + latest image summary.
+3. Optional local peep event counts from the microphone, still without raw audio upload.
+4. Zone stats entered manually.
+5. Chatbot using manual notes + latest image summary.
 
 Fallback observation input:
 
@@ -1453,7 +2377,15 @@ Fallback observation input:
   "stats": {
     "chick_count": 2,
     "heater_zone_pct_10m": 0.7,
-    "movement_score": 0.2
+    "movement_score": 0.2,
+    "peep_count_10m": 12,
+    "peep_rate_per_minute": 1.2,
+    "peep_intensity": "low",
+    "peep_trend": "steady"
+  },
+  "audio": {
+    "raw_audio_uploaded": false,
+    "events": []
   },
   "detections": []
 }
@@ -1473,6 +2405,7 @@ The project is done for the weekend when:
 
 * The public page works.
 * The webcam worker sends real or fallback observations.
+* Peep tracking, if enabled, sends only local frequency-derived events and aggregate stats.
 * The chatbot answers questions using recent chick context.
 * Admin login works.
 * Manual notes work.
@@ -1489,7 +2422,7 @@ The next development priority is the Python side of the system.
 
 Goal:
 
-> Make the local Python worker reliably turn webcam frames into useful BroodCast observations.
+> Make the edge Python service reliably turn webcam frames and optional microphone signals into useful BroodCast observations.
 
 Work next on:
 
@@ -1498,6 +2431,8 @@ Work next on:
 * Saving raw and annotated frames locally for troubleshooting.
 * Making zone calibration practical, likely by editing `services/inference/zones.json` against a real frame.
 * Replacing the fake detector in `services/inference/falcon_segment.py` with the first Falcon-Perception integration.
+* Adding `services/inference/audio.py` for local microphone peep detection.
+* Extending observation payloads and UI cards with peep event counts/trends while preserving the no-raw-audio guarantee.
 * Keeping a manual/fake detector fallback so the Remix app remains usable while model setup is in progress.
 * Improving activity scoring from centroid movement across recent frames.
 * Making push failures visible and recoverable instead of silently losing frames.

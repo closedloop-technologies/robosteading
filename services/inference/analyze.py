@@ -20,6 +20,8 @@ def point_in_polygon(point, polygon):
 
 def assign_zone(centroid, zones):
     for zone in zones:
+        if zone.get("active") is False or zone.get("assign_chicks") is False:
+            continue
         if point_in_polygon(centroid, zone["polygon"]):
             return zone["name"]
     return "unknown"

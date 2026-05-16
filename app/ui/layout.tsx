@@ -58,18 +58,24 @@ export function StatusLine() {
     return (
       <div className="status-list">
         <p>
-          <strong>Last updated:</strong> {new Date(observation.observed_at).toLocaleString()}
+          <strong>Last updated:</strong>{' '}
+          <span data-live-status="last-updated">{new Date(observation.observed_at).toLocaleString()}</span>
         </p>
         <p>
-          <strong>Chicks detected:</strong> {String(chickCount)}
+          <strong>Chicks detected:</strong>{' '}
+          <span data-live-status="chicks-detected">{String(chickCount)}</span>
         </p>
         <p>
           <strong>Comfort signal:</strong>{' '}
-          {observation.comfort_score ? `${observation.comfort_score}/5` : 'unknown'}
+          <span data-live-status="comfort-signal">
+            {observation.comfort_score ? `${observation.comfort_score}/5` : 'unknown'}
+          </span>
         </p>
         <p>
           <strong>Alerts:</strong>{' '}
-          {observation.alerts.length > 0 ? observation.alerts.join(', ') : 'none'}
+          <span data-live-status="alerts">
+            {observation.alerts.length > 0 ? observation.alerts.join(', ') : 'none'}
+          </span>
         </p>
       </div>
     )

@@ -70,6 +70,7 @@ def main():
     max_frames = int(os.environ.get("CHICKCOACH_MAX_FRAMES", "0"))
     save_frames = os.environ.get("CHICKCOACH_SAVE_FRAMES") == "1"
     save_frame_history = os.environ.get("CHICKCOACH_SAVE_FRAME_HISTORY") == "1"
+    save_manifest = os.environ.get("CHICKCOACH_SAVE_MANIFEST", "1") == "1"
     preview = os.environ.get("CHICKCOACH_PREVIEW") == "1"
     debug_dir = Path(os.environ.get("CHICKCOACH_DEBUG_DIR", "debug_frames"))
     if save_frames:
@@ -80,10 +81,13 @@ def main():
         frame_number += 1
         frame_id = f"frame_{time.time_ns()}_{frame_number}.jpg"
         frame, frame_source = capture_frame_with_source(camera_index)
+        raw_frame_path = None
+        annotated_frame_path = None
         if save_frames:
             save_frame(debug_dir / "latest_raw.jpg", frame)
             if save_frame_history:
-                save_frame(debug_dir / f"raw_{frame_id}", frame)
+                raw_frame_path = debug_dir / f"raw_{frame_id}"
+                save_frame(raw_frame_path, frame)
 
         try:
             raw_detections = detect_chicks(frame)
@@ -108,11 +112,14 @@ def main():
         if save_frames:
             save_frame(debug_dir / "latest_annotated.jpg", annotated)
             if save_frame_history:
-                save_frame(debug_dir / f"annotated_{frame_id}", annotated)
+                annotated_frame_path = debug_dir / f"annotated_{frame_id}"
+                save_frame(annotated_frame_path, annotated)
         if preview:
             preview_frame(annotated)
 
         observation = build_observation(frame_id, detections, movement_score, frame_source)
+        if save_frames and save_frame_history and save_manifest:
+            append_manifest(debug_dir / "manifest.jsonl", observation, raw_frame_path, annotated_frame_path)
         try:
             result = push_observation(observation, annotated)
             print(f"pushed {frame_id}: {result}", flush=True)
@@ -130,6 +137,16 @@ def save_frame(path, frame):
     ok = cv2.imwrite(str(path), frame)
     if not ok:
         raise RuntimeError(f"Failed to write debug frame: {path}")
+
+
+def append_manifest(path, observation, raw_frame_path, annotated_frame_path):
+    record = {
+        **observation,
+        "raw_frame_path": str(raw_frame_path) if raw_frame_path else None,
+        "annotated_frame_path": str(annotated_frame_path) if annotated_frame_path else None,
+    }
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, separators=(",", ":")) + "\n")
 
 
 def preview_frame(frame):

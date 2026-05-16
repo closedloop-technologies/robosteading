@@ -250,9 +250,155 @@ p {
   overflow: hidden;
 }
 
+.stream-frame:fullscreen {
+  aspect-ratio: auto;
+  border-radius: 0;
+  height: 100vh;
+  width: 100vw;
+}
+
+.stream-frame:fullscreen img {
+  height: 100vh;
+  width: 100vw;
+}
+
+.annotatable-frame {
+  position: relative;
+}
+
+.freeze-badge {
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(250, 204, 21, 0.75);
+  border-radius: 8px;
+  color: #fef3c7;
+  font-size: 0.82rem;
+  font-weight: 800;
+  left: 12px;
+  padding: 6px 8px;
+  position: absolute;
+  top: 12px;
+  z-index: 2;
+}
+
 .stream-frame img {
   height: 100%;
   object-fit: contain;
+  width: 100%;
+}
+
+#annotation-canvas {
+  cursor: crosshair;
+  height: 100%;
+  inset: 0;
+  pointer-events: auto;
+  position: absolute;
+  width: 100%;
+}
+
+.stream-fullscreen-button {
+  background: rgba(255, 253, 247, 0.92);
+  border: 1px solid rgba(222, 214, 200, 0.9);
+  border-radius: 8px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 7px 10px;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 3;
+}
+
+.stream-fullscreen-button:hover {
+  background: white;
+}
+
+.stream-fullscreen-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.annotation-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.panel-heading-row {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.panel-heading-row p {
+  margin: 0;
+}
+
+.audio-controls {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.audio-controls label {
+  min-width: 140px;
+}
+
+.spectrogram-shell {
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  margin-top: 16px;
+  min-height: 260px;
+  overflow: hidden;
+}
+
+#audio-spectrogram {
+  display: block;
+  height: 260px;
+  width: 100%;
+}
+
+.spectrogram-axis {
+  align-content: space-between;
+  background: #0f172a;
+  color: #cbd5e1;
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 800;
+  justify-items: center;
+  padding: 10px 6px;
+  text-transform: uppercase;
+}
+
+.audio-meter-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.audio-meter-row div {
+  display: grid;
+  gap: 6px;
+}
+
+.audio-meter-row span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.audio-meter-row meter {
+  height: 14px;
   width: 100%;
 }
 
@@ -376,6 +522,66 @@ th {
   padding-top: 12px;
 }
 
+.annotation-lab {
+  display: grid;
+  gap: 16px;
+}
+
+.annotation-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-list span {
+  background: #eef7f3;
+  border: 1px solid #c9ddd5;
+  border-radius: 8px;
+  color: var(--accent-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 6px 8px;
+}
+
+.annotation-assist {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.annotation-assist p {
+  margin: 0;
+}
+
+.annotation-assist ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.assist-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assist-suggestions button {
+  background: #fff7e6;
+  border: 1px solid #e1a366;
+  border-radius: 8px;
+  color: var(--warn);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
 @media (max-width: 840px) {
   .cc-header,
   .hero-row {
@@ -390,12 +596,23 @@ th {
   .feature-grid,
   .live-grid,
   .dashboard-grid,
+  .annotation-grid,
   .report-stats {
     grid-template-columns: 1fr;
   }
 
+  .panel-heading-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .audio-controls {
+    justify-content: flex-start;
+  }
+
   .status-list,
-  .stats-grid {
+  .stats-grid,
+  .audio-meter-row {
     grid-template-columns: 1fr;
   }
 }
