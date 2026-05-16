@@ -1,7 +1,7 @@
-const cookieName = 'chickcoach_admin'
+const cookieName = 'broodcast_admin'
 
 export function adminToken() {
-  return process.env.ADMIN_TOKEN ?? process.env.CHICKCOACH_ADMIN_TOKEN ?? 'chickcoach'
+  return process.env.ADMIN_TOKEN ?? process.env.BROODCAST_ADMIN_TOKEN ?? process.env.CHICKCOACH_ADMIN_TOKEN ?? 'broodcast'
 }
 
 export function isAdminRequest(request: Request) {

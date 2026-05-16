@@ -80,7 +80,7 @@ type StoreState = {
   publicVisible: boolean
 }
 
-const storePath = join(process.cwd(), 'tmp', 'chickcoach-store.json')
+const storePath = join(process.cwd(), 'tmp', 'broodcast-store.json')
 
 const defaultZones: BrooderZone[] = [
   { name: 'heater', polygon: [[180, 230], [520, 230], [520, 600], [180, 600]], color: '#ef4444', active: true },

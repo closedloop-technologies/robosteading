@@ -2,7 +2,7 @@ import { get, post, route } from 'remix/fetch-router/routes'
 
 export const routes = route({
   home: '/',
-  chickcheck: route('chickcheck', {
+  broodcast: route('broodcast', {
     index: get('/'),
     live: get('/live'),
     dashboard: get('/dashboard'),

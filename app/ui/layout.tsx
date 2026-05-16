@@ -19,18 +19,18 @@ export function PageShell() {
         <title>{title}</title>
         <meta name="description" content={description} />
         <link rel="icon" href="/favicon.ico" />
-        <link rel="stylesheet" href="/chickcoach.css" />
+        <link rel="stylesheet" href="/broodcast.css" />
       </head>
       <body className="cc-body">
         <header className="cc-header">
-          <a className="cc-brand" href="/chickcheck">
+          <a className="cc-brand" href="/broodcast">
             <span className="cc-mark">🐣</span>
-            <span>BroodCast Live</span>
+            <span>BroodCast</span>
           </a>
           <nav className="cc-nav">
-            <a href="/chickcheck/live">Live</a>
-            <a href="/chickcheck/report">Report</a>
-            <a href="/chickcheck/dashboard">Dashboard</a>
+            <a href="/broodcast/live">Live</a>
+            <a href="/broodcast/report">Report</a>
+            <a href="/broodcast/dashboard">Dashboard</a>
           </nav>
         </header>
         <main>{children}</main>

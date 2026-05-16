@@ -107,8 +107,8 @@ function HomePage() {
               smart automation to advanced robotics and your own home lab.
             </p>
             <div className="hero-actions">
-              <a href="/chickcheck" className="btn btn-primary">
-                Open BroodCast Live →
+              <a href="/broodcast" className="btn btn-primary">
+                Open BroodCast →
               </a>
               <a href="#inquire" className="btn btn-primary" id="hero-cta">
                 Explore Setup →

@@ -1,8 +1,8 @@
-# PRD: BroodCast Live
+# PRD: BroodCast
 
 ## 1. Product summary
 
-**BroodCast Live** is a local-first chick monitoring, annotation, and training system that starts as
+**BroodCast** is a local-first chick monitoring, annotation, and training system that starts as
 a weekend-built web app and grows into a per-family, per-location learning loop.
 
 An edge device watches a temporary chick brooder or chicken location. The edge device may be a
@@ -20,9 +20,9 @@ The audio path is privacy-preserving by design. The edge service must run audio 
 animal sound signal as possible: peeps, squeals, distress cues, and related frequency/energy
 features. Spoken language must not be extractable from anything sent to the webserver. Raw audio,
 voice clips, transcripts, voiceprints, or human-speech features are never streamed to the app.
-Visitors can watch a live annotated stream and ask questions about the chicks through a chatbot
-powered by **Kimi K2.5** and **BAML**. Admin users log in via **magic link** to configure zones, add
-manual notes, and generate a class report.
+Visitors can watch a kid-friendly annotated stream, inspect a peep spectrum, and ask questions
+about the chicks through a chatbot powered by **Kimi K2.5** and **BAML**. Admin users currently use
+a temporary token gate; production admin access should become gated auth later.
 
 Longer term, the app must support a family with one or more named chick locations, such as
 brooders, coops, runs, or quarantine pens. Cameras are attached to locations for spans of time, but
@@ -78,16 +78,16 @@ RoboSteading site.
 Shipped locally:
 
 * The original RoboSteading homepage remains at `/`.
-* BroodCast is mounted under `/chickcheck`.
-* Public live view exists at `/chickcheck/live`.
-* Admin dashboard exists at `/chickcheck/dashboard`.
-* Temporary admin token login exists at `/chickcheck/login`.
-* Report page exists at `/chickcheck/report`.
+* BroodCast is mounted under `/broodcast`.
+* Public live view exists at `/broodcast/live`.
+* Admin dashboard exists at `/broodcast/dashboard`.
+* Temporary admin token login exists at `/broodcast/login`.
+* Report page exists at `/broodcast/report`.
 * Local file/in-memory persistence stores observations, manual notes, zones, and visibility state.
-* Observation ingest APIs are available at both `/api/ingest/observation` and `/chickcheck/api/ingest/observation`.
-* Latest/recent observation, chat, manual note, zone, and report APIs exist under `/chickcheck/api/...`.
+* Observation ingest APIs are available at both `/api/ingest/observation` and `/broodcast/api/ingest/observation`.
+* Latest/recent observation, chat, manual note, zone, and report APIs exist under `/broodcast/api/...`.
 * Chat uses Fireworks Kimi through `FIREWORKS_API_KEY`, `KIMI_BASE_URL`, and `KIMI_MODEL`, with a conservative local fallback if the API call fails.
-* BAML prompt/schema files exist in `baml_src/`, but runtime chat currently calls Fireworks directly.
+* Annotation assist uses BAML; runtime chat currently calls Fireworks directly while keeping the same answer shape.
 * Safety docs, weekend runbook, and report template exist in `docs/`.
 * A Python worker scaffold exists in `services/inference/`.
 * Audio spectrum ingestion endpoints exist for Python-fed live visualization, but full
@@ -99,9 +99,10 @@ Current intentional shortcuts:
 * Auth is a temporary token gate, not magic-link auth.
 * Persistence is local JSON-backed state under `tmp/`, not the target database and bucket storage.
 * The Python edge service currently runs as a local process, not a full media server.
-* The Python worker can capture webcam frames with OpenCV, but currently uses a fake detector scaffold instead of Falcon-Perception.
-* Video is currently snapshot-based. The target architecture includes direct video stream/upload to
-  the webserver plus the parallel annotation pipeline.
+* The Python worker can capture webcam frames with OpenCV and supports fake/manual detection, YOLO,
+  RF-DETR, and Falcon-Perception paths with fallbacks.
+* Video is currently snapshot-based. The next media milestone should preserve short video clips and
+  highlight major scene changes before deciding whether to reduce retained media later.
 * The app is not production-hardened; the priority is an end-to-end weekend loop.
 
 ## 1.3 Product owner implementation decisions
@@ -111,13 +112,14 @@ current weekend build:
 
 * Prioritize getting the full loop working end to end over production features.
 * Use file/in-memory storage first instead of Supabase/Postgres.
-* Use a simple temporary password/token admin gate instead of magic-link auth.
+* Use a simple temporary password/token admin gate before adding a stronger gated-auth path.
 * Build a practical edge Python service scaffold now: webcam capture, fake/manual detector,
   annotation, and push client.
 * Add peep tracking as a local privacy-preserving audio feature extractor: webcam/laptop mic input,
   band-limited chick peep detection, event counts/intensity/coarse spectra, human-voice suppression,
   and no raw or speech-reconstructable audio upload.
-* Treat Falcon-Perception as a fast follow after webcam-to-Remix is working.
+* Treat YOLO/RF-DETR as practical local detector defaults for the immediate demo and Falcon-
+  Perception as an experimental/fast-follow detector path.
 * Keep the edge worker/service able to push observations to Remix even before a richer Python media
   server exists.
 * Use BAML/Kimi as the intended chat stack, with Fireworks Kimi configured through `FIREWORKS_API_KEY`.
@@ -307,7 +309,7 @@ Needs:
 
 ## Public live viewer
 
-1. As a visitor, I can open `/chickcheck/live` and see the latest annotated brooder image.
+1. As a visitor, I can open `/broodcast/live` and see the latest annotated brooder image.
 2. As a visitor, I can see where each chick currently appears to be.
 3. As a visitor, I can see a comfort score and recent activity summary.
 4. As a visitor, I can ask, “Are the chicks too cold?” and receive a grounded answer based on recent observations.
@@ -355,68 +357,149 @@ Needs:
 
 ---
 
-# 6. Core MVP scope
+# 6. Milestones
 
-## Must ship this weekend
+The product should move in deliberate milestones. Anything after Milestone 3 is still speculative
+until the observed demo loop proves useful with a real household brooder and a broader educational
+audience.
 
-### Public `/live`
+## Milestone 0: Local Scaffold
 
-* Latest image from webcam.
-* Chick annotations.
-* Chick zone labels.
-* Comfort score.
-* Peep activity trend.
-* Recent stats.
-* Chatbot panel: “Ask BroodCast.”
+Status: mostly shipped.
 
-### Admin `/dashboard`
+Goal: prove the end-to-end loop on one machine or LAN.
 
-* Magic-link login.
-* Latest observation.
-* Recent observation table.
-* Manual note entry.
-* Simple zone config editor, even if JSON-based.
-* Button/link to generate report.
+Scope:
 
-### Chat agent
+* `/broodcast/live`, `/broodcast/dashboard`, `/broodcast/login`, and `/broodcast/report`.
+* Root `/api/*` ingestion aliases for the Python worker.
+* Snapshot-based annotated frame updates.
+* Temporary token admin access.
+* Local JSON/file state.
+* Manual notes, public visibility toggle, zone JSON editor, report page, and chat fallback.
+* Python webcam capture with fake/manual, YOLO, RF-DETR, and Falcon detector paths.
+* Annotation lab, chick naming, and BAML-backed annotation assist.
+* Audio spectrum ingestion and display for Python-fed peep-spectrum visualization.
 
-* Kimi K2.5 via BAML.
-* Typed answer schema.
-* Uses:
+Exit criteria:
 
-  * Latest observation.
-  * Recent observations.
-  * Manual notes.
-  * Static chick-care knowledge snippets.
-* Returns:
+* The worker can push real or fake webcam observations to Remix.
+* `/broodcast/live` updates without manual refresh.
+* Chat answers cite recent observations and stay conservative.
+* Public UI clearly states that BroodCast is observational only.
 
-  * Answer.
-  * Confidence.
-  * Safety level.
-  * Suggested checks.
-  * Evidence.
+## Milestone 1: Public Educational Demo
 
-### Local vision worker
+Goal: make BroodCast useful and understandable for parents, kids, classmates, and a broader
+education-friendly audience.
 
-* Runs as the edge Python capture/inference service.
-* Captures webcam frames from at least one camera.
-* Streams/uploads allowed video/media directly to the webserver.
-* Runs Falcon-Perception on snapshots.
-* Detects chicks using prompt-based segmentation/detection.
-* Computes centroid, zone, confidence, basic movement.
-* Detects peep events from local microphone frequency features after voice suppression and without
-  uploading raw or speech-reconstructable audio.
-* Pushes annotated frames, structured annotations, metrics, outliers, and peep-derived signals to
-  the configured webserver API.
+Scope:
 
-### Report page
+* BroodCast is the only user-visible product name.
+* `/broodcast/live` is the canonical public route.
+* Keep public access open for now; add gated access later after the demo loop is stable.
+* Show latest annotated frame, chick labels, zone labels, comfort score, recent stats, and peep
+  spectrum.
+* Keep the score label as "comfort score" in user-facing UI, with supporting safety copy that it is
+  not a health diagnosis.
+* Keep chatbot access public for the demo, with conservative safety escalation and no medical
+  claims.
+* Make the report kid-friendly and classroom-shareable.
+* Preserve video clips or scene-change clips where practical; highlight large screen/camera changes
+  instead of reducing media retention too early.
 
-* Summary of weekend observations.
-* Comfort score timeline.
-* Peep activity timeline.
-* Zone occupancy summary.
-* Manual care notes.
-* Kid-friendly “what we learned” section.
+Exit criteria:
+
+* A viewer can understand what BroodCast sees without admin context.
+* The public page has no raw audio playback or download affordance.
+* The page remains useful when the worker is stale or temporarily offline.
+* The report can be shared with a teacher without overclaiming model accuracy.
+
+## Milestone 2: Audio And Media Hardening
+
+Goal: keep the educational peep spectrum while making the privacy boundary explicit and enforceable.
+
+Scope:
+
+* Move from generic spectrum frames toward local peep-event extraction in `services/inference/`.
+* Preserve peep spectrum visualization, but only from coarse, non-reconstructable bins or derived
+  event aggregates.
+* Upload peep counts, rates, dominant frequency bucket, intensity bucket, confidence, and trend.
+* Do not upload raw audio, encoded audio, speech transcripts, voiceprints, or speech-reconstructable
+  features.
+* Add visible privacy status: "No raw audio uploaded."
+* Add video clip preservation for now, especially short clips around major scene changes, camera
+  movement, missing-chick events, and unusual activity.
+
+Exit criteria:
+
+* The Python worker discards raw microphone buffers after local analysis.
+* The webserver cannot replay, download, or reconstruct audio.
+* Peep data appears as approximate behavior signal, not diagnosis.
+* Video clip retention policy is explicit even if still local/file-backed.
+
+## Milestone 3: Gated Admin And Calibration
+
+Goal: make the public demo safer to operate without overbuilding production infrastructure.
+
+Scope:
+
+* Add stronger gated admin access, likely magic-link auth or equivalent.
+* Keep public viewing open by default, but support gated/private mode.
+* Replace JSON-only zone editing with a visual calibration UI.
+* Add location, camera, camera attachment, calibration version, model version, and view-health
+  fields to observations.
+* Detect major camera movement, camera blockage, and fallen-camera states.
+* Move annotation lab behind admin or reviewer access unless intentionally opened for classroom
+  labeling.
+
+Exit criteria:
+
+* Admin-only actions are no longer protected only by a shared token.
+* A camera move marks downstream observations as degraded until recalibrated.
+* Public/private visibility behavior is predictable.
+
+## Milestone 4: Persistence And Querying
+
+Goal: replace local scratch state with durable media and queryable structured history.
+
+Scope:
+
+* S3-compatible bucket storage for images and video clips.
+* Database-backed observations, detections, annotations, peep metrics, outliers, model metadata,
+  chat context, and reports.
+* Retention policy for raw frames, annotated frames, and clips.
+* Query APIs for reports, chat evidence, peep trends, zone occupancy, and notable events.
+* Keep public pages from exposing private raw clips by default.
+
+Exit criteria:
+
+* Restarting the app does not lose observations or annotations.
+* Reports can summarize a chosen date/time window.
+* Chat can cite durable observations and manual notes.
+
+## Milestone 5: Learning System
+
+Status: speculative target architecture.
+
+Goal: evolve from one brooder demo into a per-family, per-location model-improvement loop.
+
+Scope:
+
+* Families, locations, cameras, camera attachments, named chickens, model versions, training
+  examples, scene events, and annotation provenance.
+* Human-reviewed annotations as first-class training data.
+* Explicit approval before selected frames or clips are sent to frontier vision LLMs.
+* Per-location training manifests for local models.
+* Candidate model evaluation before promotion.
+* Model-versioned historical statistics.
+
+Exit criteria:
+
+* A promoted model can be traced to training data and evaluation metrics.
+* Historical statistics are tied to the model, camera, calibration, and location context that
+  produced them.
+* Frontier LLM use remains explicit, scoped, and auditable.
 
 ---
 
@@ -727,7 +810,7 @@ Supabase/Postgres can replace the local store after the loop is working.
 
 # 10. Pages and routes
 
-Current route namespace: BroodCast is mounted under `/chickcheck` so the original RoboSteading
+Current route namespace: BroodCast is mounted under `/broodcast` so the original RoboSteading
 homepage can remain at `/`.
 
 ## 10.1 `/`
@@ -737,9 +820,9 @@ RoboSteading landing page with a link to BroodCast.
 Content:
 
 * Existing RoboSteading mission content.
-* Link to `/chickcheck`.
+* Link to `/broodcast`.
 
-## 10.2 `/chickcheck/live`
+## 10.2 `/broodcast/live`
 
 Public page.
 
@@ -770,7 +853,7 @@ If stale:
 Stream may be stale. Last observation was 12 minutes ago.
 ```
 
-## 10.3 `/chickcheck/dashboard`
+## 10.3 `/broodcast/dashboard`
 
 Admin-only.
 
@@ -785,7 +868,7 @@ Components:
 * Stream health card.
 * Report generation link.
 
-## 10.4 `/chickcheck/report`
+## 10.4 `/broodcast/report`
 
 Public or admin-shareable report page.
 
@@ -800,7 +883,7 @@ Shows:
 * Manual notes.
 * Kid-friendly summary.
 
-## 10.5 `/chickcheck/login`
+## 10.5 `/broodcast/login`
 
 Magic-link login page.
 
@@ -1658,7 +1741,7 @@ Current runtime note:
 ```text
 baml_src/
   clients.baml
-  chickcoach.baml
+  broodcast.baml
 ```
 
 ## 14.4 `clients.baml`
@@ -1674,7 +1757,7 @@ client<llm> Kimi {
 }
 ```
 
-## 14.5 `chickcoach.baml`
+## 14.5 `broodcast.baml`
 
 ```baml
 class ChickObservation {
@@ -1929,7 +2012,7 @@ Required on public and admin pages.
 # 17. Repo structure
 
 ```text
-chickcoach-live/
+broodcast/
   apps/
     web/
       app/
@@ -1967,7 +2050,7 @@ chickcoach-live/
           app.css
       baml_src/
         clients.baml
-        chickcoach.baml
+        broodcast.baml
       package.json
       Dockerfile
       fly.toml
@@ -2300,7 +2383,7 @@ Visual style:
 Suggested copy:
 
 ```text
-BroodCast Live
+BroodCast
 
 A tiny observational farm robot for learning how chicks behave.
 
@@ -2441,7 +2524,7 @@ Work next on:
 Acceptance criteria for the next pass:
 
 * The worker can run for at least 10 minutes without crashing.
-* `/chickcheck/live` updates from real webcam snapshots.
+* `/broodcast/live` updates from real webcam snapshots.
 * Annotated frames show chick boxes, labels, and zones.
 * Observation JSON includes chick count, centroid, zone, activity, confidence, comfort signal, and summary.
 * If Falcon-Perception fails, the worker continues using a fallback path and the web app shows stale or degraded data clearly.

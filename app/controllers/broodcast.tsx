@@ -38,7 +38,7 @@ export const live = {
     let annotations = await listAnnotations()
     let chickIdentities = await listChickIdentities()
     return render(
-      <PageShell title="BroodCast Live" description="A window into the secret life of chicks.">
+      <PageShell title="BroodCast" description="A window into the secret life of chicks.">
         <LivePage
           latest={latest}
           recent={recent}
@@ -54,7 +54,7 @@ export const live = {
 
 export const dashboard = {
   async handler({ request }: { request: Request }) {
-    if (!isAdminRequest(request)) return redirect('/chickcheck/login?next=/chickcheck/dashboard')
+    if (!isAdminRequest(request)) return redirect('/broodcast/login?next=/broodcast/dashboard')
     let latest = await latestObservation()
     let recent = await listObservations(120)
     let notes = await listManualNotes({ includePrivate: true })
@@ -84,8 +84,8 @@ export const login = {
           <h1>BroodCast Login</h1>
           <p className="muted">Use the temporary weekend admin token.</p>
           {failed ? <p className="form-error">That token did not match.</p> : null}
-          <form className="stack-form" method="post" action="/chickcheck/login">
-            <input type="hidden" name="next" value={url.searchParams.get('next') ?? '/chickcheck/dashboard'} />
+          <form className="stack-form" method="post" action="/broodcast/login">
+            <input type="hidden" name="next" value={url.searchParams.get('next') ?? '/broodcast/dashboard'} />
             <label>
               Admin token
               <input name="token" type="password" autoComplete="current-password" required />
@@ -105,15 +105,15 @@ export const loginAction = {
   async handler({ request }: { request: Request }) {
     let form = await request.formData()
     let token = String(form.get('token') ?? '')
-    let next = String(form.get('next') ?? '/chickcheck/dashboard')
-    if (token !== adminToken()) return redirect('/chickcheck/login?error=1')
-    return redirect(next.startsWith('/') ? next : '/chickcheck/dashboard', 303, { 'Set-Cookie': adminCookie() })
+    let next = String(form.get('next') ?? '/broodcast/dashboard')
+    if (token !== adminToken()) return redirect('/broodcast/login?error=1')
+    return redirect(next.startsWith('/') ? next : '/broodcast/dashboard', 303, { 'Set-Cookie': adminCookie() })
   },
 }
 
 export const logout = {
   async handler() {
-    return redirect('/chickcheck/live', 303, { 'Set-Cookie': clearAdminCookie() })
+    return redirect('/broodcast/live', 303, { 'Set-Cookie': clearAdminCookie() })
   },
 }
 
@@ -329,7 +329,7 @@ export const apiManualNotes = {
     let saved = await addManualNote(note.trim(), visibility)
     return contentType.includes('application/json')
       ? json({ ok: true, note: saved })
-      : redirect('/chickcheck/dashboard')
+      : redirect('/broodcast/dashboard')
   },
 }
 
@@ -340,14 +340,14 @@ export const apiZones = {
 
     if (form.has('public_visible')) {
       await setPublicVisible(form.get('public_visible') === 'true')
-      return redirect('/chickcheck/dashboard')
+      return redirect('/broodcast/dashboard')
     }
 
     try {
       let zones = JSON.parse(String(form.get('zones') ?? '[]'))
       if (!Array.isArray(zones)) throw new Error('zones must be an array')
       await replaceZones(zones)
-      return redirect('/chickcheck/dashboard')
+      return redirect('/broodcast/dashboard')
     } catch {
       return json({ ok: false, error: 'Zone JSON is invalid.' }, { status: 400 })
     }
@@ -379,14 +379,14 @@ function LivePage() {
       <div className="hero-row">
         <div>
           <p className="eyebrow">Tune in to the Secret Life of Chicks</p>
-          <h1>BroodCast Live</h1>
+          <h1>BroodCast</h1>
           <p className="lead">
             A tiny window into the world of our growing flock. BroodCast uses computer vision to
             watch, label, and explain what the chicks are doing—helping us become more attentive
             stewards while the chicks do their thing.
           </p>
         </div>
-        <a className="btn btn-secondary" href="/chickcheck/report">
+        <a className="btn btn-secondary" href="/broodcast/report">
           Weekend report
         </a>
       </div>
@@ -543,7 +543,7 @@ function LivePage() {
         <h2>Recent Observations</h2>
         <ObservationTable observations={recent.slice(0, 8)} />
       </section>
-      <script src="/chickcoach.js?v=python-audio-spectrogram-1"></script>
+      <script src="/broodcast.js?v=python-audio-spectrogram-1"></script>
     </section>
   )
 }
@@ -558,7 +558,7 @@ function DashboardPage() {
           <h1>BroodCast Dashboard</h1>
           <p className="lead">Manage your stream, review care notes, and tune the vision system.</p>
         </div>
-        <form method="post" action="/chickcheck/logout">
+        <form method="post" action="/broodcast/logout">
           <button className="btn btn-secondary" type="submit">
             Sign out
           </button>
@@ -573,7 +573,7 @@ function DashboardPage() {
         <section className="panel">
           <h2>Stream Visibility</h2>
           <p className="big-value">{visible ? 'Public' : 'Paused'}</p>
-          <form method="post" action="/chickcheck/api/zones" className="button-row">
+          <form method="post" action="/broodcast/api/zones" className="button-row">
             <button className="btn btn-secondary" name="public_visible" value="true" type="submit">
               Show
             </button>
@@ -586,7 +586,7 @@ function DashboardPage() {
       <div className="dashboard-grid">
         <section className="panel">
           <h2>Manual Note</h2>
-          <form className="stack-form" method="post" action="/chickcheck/api/manual-notes">
+          <form className="stack-form" method="post" action="/broodcast/api/manual-notes">
             <label>
               Note
               <textarea name="note" rows={4} required placeholder="e.g., Refilled water, checked heat lamp..."></textarea>
@@ -612,7 +612,7 @@ function DashboardPage() {
         </section>
         <section className="panel">
           <h2>Vision Config</h2>
-          <form className="stack-form" method="post" action="/chickcheck/api/zones">
+          <form className="stack-form" method="post" action="/broodcast/api/zones">
             <textarea name="zones" rows={12}>{JSON.stringify(zones, null, 2)}</textarea>
             <button className="btn btn-primary" type="submit">
               Save zones

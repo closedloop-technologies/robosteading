@@ -1,4 +1,4 @@
-const appBase = window.location.pathname.startsWith('/chickcheck') ? '/chickcheck' : ''
+const appBase = window.location.pathname.startsWith('/broodcast') ? '/broodcast' : ''
 const latestUrl = `${appBase}/api/latest`
 const chatUrl = `${appBase}/api/chat`
 

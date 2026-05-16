@@ -152,7 +152,7 @@ def append_manifest(path, observation, raw_frame_path, annotated_frame_path):
 def preview_frame(frame):
     import cv2
 
-    cv2.imshow("ChickCoach preview", frame)
+    cv2.imshow("BroodCast preview", frame)
     cv2.waitKey(1)
 
 

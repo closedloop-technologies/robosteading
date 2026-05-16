@@ -1,4 +1,4 @@
-# ChickCoach Local Inference Worker
+# BroodCast Local Inference Worker
 
 This is the weekend scaffold for the webcam-to-Remix loop.
 
@@ -20,7 +20,7 @@ Run it after the Remix app is running:
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-CHICKCOACH_API_URL=http://localhost:44100 STREAM_INGEST_TOKEN=dev-stream-token python main.py
+BROODCAST_API_URL=http://localhost:44100 STREAM_INGEST_TOKEN=dev-stream-token python main.py
 ```
 
 From the repo root, run both local dev loops together:
@@ -37,18 +37,18 @@ Use `Ctrl-C` once to stop both processes.
 Run it in Docker with the brooder camera:
 
 ```sh
-docker build -t chickcoach-inference .
+docker build -t broodcast-inference .
 docker run --rm \
   --device=/dev/video2:/dev/video2 \
   --add-host=host.docker.internal:host-gateway \
   -e CAMERA_INDEX=2 \
-  -e CHICKCOACH_API_URL=http://host.docker.internal:44100 \
+  -e BROODCAST_API_URL=http://host.docker.internal:44100 \
   -e STREAM_INGEST_TOKEN=dev-stream-token \
   -e CHICKCOACH_DETECTOR=yolo \
   -e YOLO_CLASS_IDS=14 \
   -e YOLO_CONFIDENCE=0.03 \
   -e YOLO_IMAGE_SIZE=960 \
-  chickcoach-inference
+  broodcast-inference
 ```
 
 Useful weekend test modes:
@@ -78,7 +78,8 @@ CHICKCOACH_DETECTOR=rfdetr RFDETR_MODEL=nano RFDETR_CLASS_IDS=14 python main.py
 
 Environment variables:
 
-- `CHICKCOACH_API_URL`: Remix app base URL. Defaults to `http://localhost:44100`.
+- `BROODCAST_API_URL`: Remix app base URL. Defaults to `http://localhost:44100`.
+- `CHICKCOACH_API_URL`: legacy alias for `BROODCAST_API_URL`.
 - `STREAM_INGEST_TOKEN`: Bearer token for `/api/ingest/observation`.
 - `CAMERA_INDEX`: OpenCV camera index. Defaults to `0`.
 - `CAPTURE_INTERVAL_SECONDS`: seconds between frames. Defaults to `3`.

@@ -14,8 +14,12 @@ def encode_jpeg_base64(frame):
     return base64.b64encode(buffer).decode("ascii")
 
 
+def api_base_url():
+    return os.environ.get("BROODCAST_API_URL", os.environ.get("CHICKCOACH_API_URL", "http://localhost:44100")).rstrip("/")
+
+
 def push_observation(observation, annotated_frame):
-    api_url = os.environ.get("CHICKCOACH_API_URL", "http://localhost:44100").rstrip("/")
+    api_url = api_base_url()
     token = os.environ.get("STREAM_INGEST_TOKEN", "dev-stream-token")
     payload = {
         **observation,
@@ -32,7 +36,7 @@ def push_observation(observation, annotated_frame):
 
 
 def push_audio_spectrum(bins, *, sample_rate, channels=1, levels=None, timestamp=None):
-    api_url = os.environ.get("CHICKCOACH_API_URL", "http://localhost:44100").rstrip("/")
+    api_url = api_base_url()
     token = os.environ.get("STREAM_INGEST_TOKEN", "dev-stream-token")
     payload = {
         "timestamp": timestamp,
