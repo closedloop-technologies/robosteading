@@ -1,6 +1,10 @@
 import { serve } from 'remix/node-serve'
 
-import { router } from './app/router.ts'
+import { loadDotEnv } from './app/utils/env.ts'
+
+loadDotEnv()
+
+const { router } = await import('./app/router.ts')
 
 const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 44100
 

@@ -4,3 +4,8 @@ creds.json
 node_modules/
 .firecrawl/
 dist/
+tmp/
+public/uploads/*
+!public/uploads/.gitkeep
+__pycache__/
+*.pyc
