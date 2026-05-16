@@ -56,15 +56,16 @@ export interface AnnotationAssistResult {
 
 export interface AnnotationSuggestion {
   label: "chick" | "heater" | "water" | "food" | "waste" | "bedding"
-  kind: "box" | "point"
+  kind: "box" | "corners" | "point"
   reason: string
   
 }
 
 export interface BrooderAnnotation {
   label: string
-  kind: "box" | "point"
+  kind: "box" | "corners" | "point"
   bounding_box?: number[] | null
+  corners?: number[][] | null
   point?: number[] | null
   frame_id?: string | null
   created_by: string
@@ -110,8 +111,9 @@ export interface ChickObservation {
 
 export interface DraftAnnotation {
   label?: string | null
-  kind: "box" | "point"
+  kind: "box" | "corners" | "point"
   bounding_box?: number[] | null
+  corners?: number[][] | null
   point?: number[] | null
   image_size?: number[] | null
   

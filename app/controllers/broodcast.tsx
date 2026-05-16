@@ -232,14 +232,19 @@ export const apiAnnotations = {
 
     let input = body as Record<string, unknown>
     let label = String(input.label ?? '').trim()
-    let kind: 'box' | 'point' = input.kind === 'point' ? 'point' : 'box'
-    let box = Array.isArray(input.box) ? input.box.map(Number).slice(0, 4) : null
-    let point = Array.isArray(input.point) ? input.point.map(Number).slice(0, 2) : null
-    let imageSize = Array.isArray(input.image_size) ? input.image_size.map(Number).slice(0, 2) : null
+    let kind: 'box' | 'corners' | 'point' =
+      input.kind === 'point' ? 'point' : input.kind === 'box' ? 'box' : 'corners'
+    let box = readNumberTuple(input.box, 4)
+    let corners = readCorners(input.corners)
+    let point = readNumberTuple(input.point, 2)
+    let imageSize = readNumberTuple(input.image_size, 2)
 
     if (!label) return json({ ok: false, error: 'Label is required.' }, { status: 400 })
     if (kind === 'box' && (!box || box.length !== 4)) {
       return json({ ok: false, error: 'Box annotations need four coordinates.' }, { status: 400 })
+    }
+    if (kind === 'corners' && (!corners || corners.length !== 4)) {
+      return json({ ok: false, error: 'Corner annotations need four corner points.' }, { status: 400 })
     }
     if (kind === 'point' && (!point || point.length !== 2)) {
       return json({ ok: false, error: 'Point annotations need two coordinates.' }, { status: 400 })
@@ -252,12 +257,26 @@ export const apiAnnotations = {
       observation_id: typeof input.observation_id === 'string' ? input.observation_id : null,
       frame_id: typeof input.frame_id === 'string' ? input.frame_id : null,
       box,
+      corners,
       point,
       image_size: imageSize,
       created_by: typeof input.created_by === 'string' ? input.created_by : 'kid',
     })
     return json({ ok: true, annotation })
   },
+}
+
+function readNumberTuple(value: unknown, length: number) {
+  if (!Array.isArray(value)) return null
+  let numbers = value.map(Number).slice(0, length)
+  return numbers.length === length && numbers.every(Number.isFinite) ? numbers.map(Math.round) : null
+}
+
+function readCorners(value: unknown) {
+  if (!Array.isArray(value)) return null
+  let corners = value.slice(0, 4).map((point) => readNumberTuple(point, 2))
+  if (corners.length !== 4 || corners.some((point) => !point)) return null
+  return corners as number[][]
 }
 
 export const apiAnnotationAssist = {
@@ -500,8 +519,9 @@ function LivePage() {
             <label>
               Shape
               <select name="kind">
-                <option value="box">Box</option>
+                <option value="corners">Corners</option>
                 <option value="point">Point</option>
+                <option value="box">Axis-aligned box</option>
               </select>
             </label>
             <input type="hidden" name="geometry" />

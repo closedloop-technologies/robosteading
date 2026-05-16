@@ -31,7 +31,7 @@ export default class TypeBuilder {
     
     AnnotationSuggestion: ClassViewer<'AnnotationSuggestion', "label" | "kind" | "reason">;
     
-    BrooderAnnotation: ClassViewer<'BrooderAnnotation', "label" | "kind" | "bounding_box" | "point" | "frame_id" | "created_by">;
+    BrooderAnnotation: ClassViewer<'BrooderAnnotation', "label" | "kind" | "bounding_box" | "corners" | "point" | "frame_id" | "created_by">;
     
     ChickAnswer: ClassViewer<'ChickAnswer', "answer" | "confidence" | "safety_level" | "suggested_checks" | "evidence" | "follow_up_questions">;
     
@@ -41,7 +41,7 @@ export default class TypeBuilder {
     
     ChickObservation: ClassViewer<'ChickObservation', "timestamp" | "comfort_score" | "summary" | "alerts" | "heater_zone_pct_10m" | "food_water_zone_pct_10m" | "movement_score">;
     
-    DraftAnnotation: ClassViewer<'DraftAnnotation', "label" | "kind" | "bounding_box" | "point" | "image_size">;
+    DraftAnnotation: ClassViewer<'DraftAnnotation', "label" | "kind" | "bounding_box" | "corners" | "point" | "image_size">;
     
     
 
@@ -65,7 +65,7 @@ export default class TypeBuilder {
         ]);
         
         this.BrooderAnnotation = this.tb.classViewer("BrooderAnnotation", [
-          "label","kind","bounding_box","point","frame_id","created_by",
+          "label","kind","bounding_box","corners","point","frame_id","created_by",
         ]);
         
         this.ChickAnswer = this.tb.classViewer("ChickAnswer", [
@@ -85,7 +85,7 @@ export default class TypeBuilder {
         ]);
         
         this.DraftAnnotation = this.tb.classViewer("DraftAnnotation", [
-          "label","kind","bounding_box","point","image_size",
+          "label","kind","bounding_box","corners","point","image_size",
         ]);
         
         

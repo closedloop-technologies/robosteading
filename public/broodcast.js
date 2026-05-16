@@ -407,6 +407,32 @@ function toCanvasBox(box, metrics) {
   ]
 }
 
+function toCanvasPoint(point, metrics) {
+  return [
+    metrics.left + (point[0] / metrics.naturalWidth) * metrics.width,
+    metrics.top + (point[1] / metrics.naturalHeight) * metrics.height,
+  ]
+}
+
+function toCanvasCorners(corners, metrics) {
+  return corners.map((point) => toCanvasPoint(point, metrics))
+}
+
+function drawCornerShape(ctx, corners, options = {}) {
+  if (!corners.length) return
+  ctx.beginPath()
+  ctx.moveTo(corners[0][0], corners[0][1])
+  for (const point of corners.slice(1)) ctx.lineTo(point[0], point[1])
+  if (options.closed) ctx.closePath()
+  ctx.stroke()
+  for (const [index, point] of corners.entries()) {
+    ctx.beginPath()
+    ctx.arc(point[0], point[1], options.radius || 4, 0, Math.PI * 2)
+    ctx.fill()
+    if (options.numbered) ctx.fillText(String(index + 1), point[0] + 7, point[1] - 7)
+  }
+}
+
 function readableChickBox(box) {
   let [x1, y1, x2, y2] = box
   const minSize = 22
@@ -450,8 +476,14 @@ function drawAnnotations() {
       ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
       ctx.fillText(annotation.label, x1 + 4, Math.max(14, y1 - 4))
     }
+    if (annotation.kind === 'corners' && Array.isArray(annotation.corners)) {
+      const corners = toCanvasCorners(annotation.corners, metrics)
+      drawCornerShape(ctx, corners, { closed: corners.length === 4 })
+      const [labelX, labelY] = corners[0] || [metrics.left, metrics.top]
+      ctx.fillText(annotation.label, labelX + 4, Math.max(14, labelY - 4))
+    }
     if (annotation.kind === 'point' && annotation.point) {
-      const [x, y] = toCanvasBox([...annotation.point, ...annotation.point], metrics)
+      const [x, y] = toCanvasPoint(annotation.point, metrics)
       ctx.beginPath()
       ctx.arc(x, y, 5, 0, Math.PI * 2)
       ctx.fill()
@@ -504,6 +536,14 @@ function drawAnnotations() {
     ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
     ctx.setLineDash([])
   }
+  if (draftShape?.kind === 'corners') {
+    const corners = toCanvasCorners(draftShape.corners, metrics)
+    ctx.strokeStyle = '#f59e0b'
+    ctx.fillStyle = '#f59e0b'
+    ctx.setLineDash(corners.length === 4 ? [] : [6, 4])
+    drawCornerShape(ctx, corners, { closed: corners.length === 4, numbered: true, radius: 5 })
+    ctx.setLineDash([])
+  }
 }
 
 function renderAssist(payload) {
@@ -533,8 +573,9 @@ async function requestAnnotationAssist() {
       detections: currentDetections,
       draft: {
         label: partAnnotationForm?.elements.label.value.trim() || null,
-        kind: draftShape?.kind || partAnnotationForm?.elements.kind.value || 'box',
+        kind: draftShape?.kind || partAnnotationForm?.elements.kind.value || 'corners',
         box: draftShape?.box || null,
+        corners: draftShape?.corners || null,
         point: draftShape?.point || null,
         image_size: liveImage?.naturalWidth ? [liveImage.naturalWidth, liveImage.naturalHeight] : null,
       },
@@ -583,7 +624,7 @@ if (annotationCanvas && partAnnotationForm) {
     freezeFrame()
     dragStart = canvasPoint(event)
     dragStartClient = [event.clientX, event.clientY]
-    draftShape = null
+    if (partAnnotationForm.elements.kind.value !== 'corners') draftShape = null
   })
 
   annotationCanvas.addEventListener('pointermove', (event) => {
@@ -605,10 +646,25 @@ if (annotationCanvas && partAnnotationForm) {
   annotationCanvas.addEventListener('pointerup', (event) => {
     const end = canvasPoint(event)
     if (!dragStart || !end) return
+    const kind = partAnnotationForm.elements.kind.value
+    if (kind === 'corners') {
+      const currentCorners = draftShape?.kind === 'corners' && draftShape.corners.length < 4 ? draftShape.corners : []
+      draftShape = { kind: 'corners', corners: [...currentCorners, end].slice(0, 4) }
+      dragStart = null
+      dragStartClient = null
+      drawAnnotations()
+      if (draftShape.corners.length === 4) {
+        requestAnnotationAssist()
+      } else if (annotationAssist) {
+        annotationAssist.classList.remove('muted')
+        annotationAssist.textContent = `Corner ${draftShape.corners.length} of 4 marked.`
+      }
+      return
+    }
     const dragDistance = dragStartClient
       ? Math.hypot(event.clientX - dragStartClient[0], event.clientY - dragStartClient[1])
       : 0
-    if (partAnnotationForm.elements.kind.value === 'point' || dragDistance < 6) {
+    if (kind === 'point' || dragDistance < 6) {
       draftShape = { kind: 'point', point: end }
     } else {
       draftShape = {
@@ -630,12 +686,14 @@ if (annotationCanvas && partAnnotationForm) {
   partAnnotationForm.addEventListener('submit', async (event) => {
     event.preventDefault()
     if (!draftShape) return
+    if (draftShape.kind === 'corners' && draftShape.corners.length !== 4) return
     const label = partAnnotationForm.elements.label.value.trim()
     if (!label) return
     const payload = {
       label,
       kind: draftShape.kind,
       box: draftShape.box,
+      corners: draftShape.corners,
       point: draftShape.point,
       observation_id: currentObservation?.id || annotationLab?.dataset.observationId || null,
       frame_id: currentObservation?.frame_id || annotationLab?.dataset.frameId || null,
@@ -651,6 +709,13 @@ if (annotationCanvas && partAnnotationForm) {
       partAnnotationForm.reset()
       await refreshAnnotations()
     }
+  })
+
+  partAnnotationForm.elements.kind.addEventListener('change', () => {
+    draftShape = null
+    dragStart = null
+    dragStartClient = null
+    drawAnnotations()
   })
 }
 

@@ -65,8 +65,9 @@ class ChickDetection {
 
 class BrooderAnnotation {
   label string
-  kind "box" | "point"
+  kind "box" | "corners" | "point"
   bounding_box int[]?
+  corners int[][]?
   point int[]?
   frame_id string?
   created_by string
@@ -79,15 +80,16 @@ class ChickIdentity {
 
 class DraftAnnotation {
   label string?
-  kind "box" | "point"
+  kind "box" | "corners" | "point"
   bounding_box int[]?
+  corners int[][]?
   point int[]?
   image_size int[]?
 }
 
 class AnnotationSuggestion {
   label "chick" | "heater" | "water" | "food" | "waste" | "bedding"
-  kind "box" | "point"
+  kind "box" | "corners" | "point"
   reason string
 }
 
@@ -112,6 +114,7 @@ function AssistBrooderAnnotation(
 
     Rules:
     - Allowed labels are chick, heater, water, food, waste, bedding.
+    - Prefer four-corner annotations for visible objects; use box only for legacy axis-aligned rectangles.
     - Use chick only when the annotation covers a visible chick body.
     - Do not label poop, feed, bedding, shadows, stains, or dark specks as chick.
     - Prefer waste for poop/droppings.

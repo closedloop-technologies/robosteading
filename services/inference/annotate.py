@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import cv2
 
 
@@ -17,28 +19,32 @@ def hex_to_bgr(value, fallback):
 
 def draw_annotations(frame, detections, zones):
     annotated = frame.copy()
-    for zone in zones:
-        polygon = zone["polygon"]
-        color = hex_to_bgr(zone.get("color"), (40, 120, 80))
-        thickness = 3 if zone.get("kind") == "object" else 2
-        for index, point in enumerate(polygon):
-            next_point = polygon[(index + 1) % len(polygon)]
-            cv2.line(annotated, tuple(point), tuple(next_point), color, thickness)
-        cv2.putText(
-            annotated,
-            zone["name"],
-            tuple(polygon[0]),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
-            color,
-            2,
-        )
+    if os.getenv("CHICKCOACH_DRAW_ZONES") == "1":
+        zone_layer = annotated.copy()
+        for zone in zones:
+            polygon = zone["polygon"]
+            color = hex_to_bgr(zone.get("color"), (40, 120, 80))
+            points = [tuple(point) for point in polygon]
+            for index, point in enumerate(points):
+                next_point = points[(index + 1) % len(points)]
+                cv2.line(zone_layer, point, next_point, color, 1)
+            label_at = points[0]
+            cv2.putText(
+                zone_layer,
+                zone["name"],
+                (label_at[0] + 4, label_at[1] + 16),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                color,
+                1,
+            )
+        annotated = cv2.addWeighted(zone_layer, 0.35, annotated, 0.65, 0)
 
     for detection in detections:
         x1, y1, x2, y2 = detection["bbox"]
         color = (30, 130, 210)
-        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 3)
-        label = f'{detection.get("class_name", "chick")} {detection["track_id"]} {detection["zone"]} {detection["activity"]}'
-        cv2.putText(annotated, label, (x1, max(24, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (30, 90, 150), 2)
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+        label = detection.get("track_id", detection.get("class_name", "chick"))
+        cv2.putText(annotated, label, (x1, max(18, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
 
     return annotated

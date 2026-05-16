@@ -43,13 +43,14 @@ export namespace partial_types {
     }
     export interface AnnotationSuggestion {
       label?: "chick" | "heater" | "water" | "food" | "waste" | "bedding" | null
-      kind?: "box" | "point" | null
+      kind?: "box" | "corners" | "point" | null
       reason?: string | null
     }
     export interface BrooderAnnotation {
       label?: string | null
-      kind?: "box" | "point" | null
+      kind?: "box" | "corners" | "point" | null
       bounding_box?: number[] | null
+      corners?: number[][] | null
       point?: number[] | null
       frame_id?: string | null
       created_by?: string | null
@@ -85,8 +86,9 @@ export namespace partial_types {
     }
     export interface DraftAnnotation {
       label?: string | null
-      kind?: "box" | "point" | null
+      kind?: "box" | "corners" | "point" | null
       bounding_box?: number[] | null
+      corners?: number[][] | null
       point?: number[] | null
       image_size?: number[] | null
     }

@@ -7,9 +7,10 @@ export type AnnotationAssistInput = {
   annotations: BrooderAnnotation[]
   chickIdentities: ChickIdentity[]
   draft: {
-    kind?: 'box' | 'point'
+    kind?: 'box' | 'corners' | 'point'
     label?: string
     box?: number[] | null
+    corners?: number[][] | null
     point?: number[] | null
     image_size?: number[] | null
   } | null
@@ -20,7 +21,7 @@ export type AnnotationAssistResult = {
   guidance: string
   suggestions: Array<{
     label: string
-    kind: 'box' | 'point'
+    kind: 'box' | 'corners' | 'point'
     reason: string
   }>
   quality_checks: string[]
@@ -49,8 +50,9 @@ async function assistWithBaml(input: AnnotationAssistInput) {
       })),
       {
         label: input.draft?.label ?? null,
-        kind: input.draft?.kind === 'point' ? 'point' : 'box',
+        kind: normalizeKind(input.draft?.kind),
         bounding_box: input.draft?.box ?? null,
+        corners: input.draft?.corners ?? null,
         point: input.draft?.point ?? null,
         image_size: input.draft?.image_size ?? null,
       },
@@ -73,10 +75,10 @@ function fallbackAssist(input: AnnotationAssistInput): Omit<AnnotationAssistResu
   let draftLabel = String(input.draft?.label ?? '').trim().toLowerCase()
   let chickCount = input.observation?.stats.chick_count ?? input.detections.length
   let suggestions = [
-    { label: 'waste', kind: 'box' as const, reason: 'Use this for poop, dark droppings, stains, or bedding debris.' },
-    { label: 'food', kind: 'box' as const, reason: 'Use this for the feeder or spilled feed.' },
-    { label: 'water', kind: 'box' as const, reason: 'Use this for the drinker or water line.' },
-    { label: 'chick', kind: 'box' as const, reason: 'Use this only for a visible chick body.' },
+    { label: 'waste', kind: 'corners' as const, reason: 'Mark the visible waste outline with four corners.' },
+    { label: 'food', kind: 'corners' as const, reason: 'Mark the feeder or spilled feed with four corners.' },
+    { label: 'water', kind: 'corners' as const, reason: 'Mark the drinker or water line with four corners.' },
+    { label: 'chick', kind: 'corners' as const, reason: 'Use this only for a visible chick body.' },
   ]
   if (draftLabel) {
     suggestions = suggestions.filter((suggestion) => suggestion.label === draftLabel).concat(
@@ -87,12 +89,12 @@ function fallbackAssist(input: AnnotationAssistInput): Omit<AnnotationAssistResu
   return {
     guidance:
       chickCount > 0
-        ? 'Check each model chick box before saving; relabel poop or bedding as waste instead of chick.'
-        : 'No reliable chick detections are active, so manually box only objects you can clearly identify.',
+        ? 'Check each model chick detection before saving; relabel poop or bedding as waste instead of chick.'
+        : 'No reliable chick detections are active, so manually mark corners around objects you can clearly identify.',
     suggestions: suggestions.slice(0, 4),
     quality_checks: [
-      'Freeze the frame before drawing so the saved box matches the image.',
-      'Make boxes snug around the object, not the whole brooder area.',
+      'Freeze the frame before placing corners so the saved shape matches the image.',
+      'Place the four corners around the object, not the whole brooder area.',
       'Use waste for poop and bedding debris.',
       'Use chick only when the body is visible.',
     ],
@@ -105,7 +107,7 @@ function normalizeAssist(value: Partial<Omit<AnnotationAssistResult, 'provider'>
     ? value.suggestions
         .map((suggestion) => ({
           label: brooderLabels.includes(String(suggestion.label)) ? String(suggestion.label) : 'waste',
-          kind: (suggestion.kind === 'point' ? 'point' : 'box') as 'box' | 'point',
+          kind: normalizeKind(suggestion.kind),
           reason: typeof suggestion.reason === 'string' ? suggestion.reason : 'Suggested by Kimi.',
         }))
         .slice(0, 4)
@@ -146,12 +148,17 @@ function toBamlDetection(detection: Detection) {
 function toBamlAnnotation(annotation: BrooderAnnotation) {
   return {
     label: annotation.label,
-    kind: annotation.kind,
+    kind: normalizeKind(annotation.kind),
     bounding_box: annotation.box,
+    corners: annotation.corners,
     point: annotation.point,
     frame_id: annotation.frame_id,
     created_by: annotation.created_by,
   }
+}
+
+function normalizeKind(value: unknown): 'box' | 'corners' | 'point' {
+  return value === 'point' ? 'point' : value === 'box' ? 'box' : 'corners'
 }
 
 function kimiBaseUrl() {
