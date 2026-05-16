@@ -9,3 +9,5 @@ public/uploads/*
 !public/uploads/.gitkeep
 __pycache__/
 *.pyc
+services/inference/debug_frames/
+services/inference/*.pt

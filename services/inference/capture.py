@@ -8,15 +8,20 @@ import numpy as np
 
 
 def capture_frame(camera_index):
+    frame, _source = capture_frame_with_source(camera_index)
+    return frame
+
+
+def capture_frame_with_source(camera_index):
     if os.environ.get("CHICKCOACH_FAKE_CAMERA") == "1":
-        return fallback_frame()
+        return fallback_frame(), "fake"
 
     camera = cv2.VideoCapture(camera_index)
     ok, frame = camera.read()
     camera.release()
     if ok and frame is not None:
-        return frame
-    return fallback_frame()
+        return frame, "webcam"
+    return fallback_frame(), "fallback"
 
 
 def fallback_frame():

@@ -24,8 +24,8 @@ export function PageShell() {
       <body className="cc-body">
         <header className="cc-header">
           <a className="cc-brand" href="/chickcheck">
-            <span className="cc-mark">CC</span>
-            <span>ChickCoach Live</span>
+            <span className="cc-mark">🐣</span>
+            <span>BroodCast Live</span>
           </a>
           <nav className="cc-nav">
             <a href="/chickcheck/live">Live</a>
@@ -42,7 +42,7 @@ export function PageShell() {
 export function SafetyBanner() {
   return () => (
     <div className="safety-banner" role="note">
-      ChickCoach is an observational learning tool. It does not replace adult supervision. Always
+      BroodCast is an observational learning tool. It does not replace adult supervision. Always
       directly check food, water, temperature, bedding, and chick behavior.
     </div>
   )

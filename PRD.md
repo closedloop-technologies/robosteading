@@ -1,12 +1,57 @@
-# PRD: ChickCoach Live
+# PRD: BroodCast Live
 
 ## 1. Product summary
 
-**ChickCoach Live** is a weekend-built, web-based chick monitoring and education app.
+**BroodCast Live** is a weekend-built, web-based chick monitoring and education app.
 
 A laptop webcam watches a temporary chick brooder. A local vision worker uses **Falcon-Perception** to identify chicks in the camera feed, compute simple location/activity stats, and push observations to a deployed **Remix 3** app on **Fly.io**. Visitors can watch a live annotated stream and ask questions about the chicks through a chatbot powered by **Kimi K2.5** and **BAML**. Admin users log in via **magic link** to configure zones, add manual notes, and generate a class report.
 
 The product is observational only. It does not control heat, food, water, lights, motors, or any physical system.
+
+## 1.1 Current implementation state
+
+As of the current repo state, BroodCast has an end-to-end weekend MVP scaffold inside the existing
+RoboSteading site.
+
+Shipped locally:
+
+* The original RoboSteading homepage remains at `/`.
+* BroodCast is mounted under `/chickcheck`.
+* Public live view exists at `/chickcheck/live`.
+* Admin dashboard exists at `/chickcheck/dashboard`.
+* Temporary admin token login exists at `/chickcheck/login`.
+* Report page exists at `/chickcheck/report`.
+* Local file/in-memory persistence stores observations, manual notes, zones, and visibility state.
+* Observation ingest APIs are available at both `/api/ingest/observation` and `/chickcheck/api/ingest/observation`.
+* Latest/recent observation, chat, manual note, zone, and report APIs exist under `/chickcheck/api/...`.
+* Chat uses Fireworks Kimi through `FIREWORKS_API_KEY`, `KIMI_BASE_URL`, and `KIMI_MODEL`, with a conservative local fallback if the API call fails.
+* BAML prompt/schema files exist in `baml_src/`, but runtime chat currently calls Fireworks directly.
+* Safety docs, weekend runbook, and report template exist in `docs/`.
+* A Python worker scaffold exists in `services/inference/`.
+
+Current intentional shortcuts:
+
+* Auth is a temporary token gate, not magic-link auth.
+* Persistence is local JSON-backed state under `tmp/`, not Postgres/Supabase.
+* The Python worker is a local process, not a server.
+* The Python worker can capture webcam frames with OpenCV, but currently uses a fake detector scaffold instead of Falcon-Perception.
+* Video is snapshot-based. There is no full video streaming infrastructure.
+* The app is not production-hardened; the priority is an end-to-end weekend loop.
+
+## 1.2 Product owner implementation decisions
+
+These decisions supersede the heavier production recommendations elsewhere in this PRD for the
+current weekend build:
+
+* Prioritize getting the full loop working end to end over production features.
+* Use file/in-memory storage first instead of Supabase/Postgres.
+* Use a simple temporary password/token admin gate instead of magic-link auth.
+* Build a practical local Python worker scaffold now: webcam capture, fake/manual detector, annotation, and push client.
+* Treat Falcon-Perception as a fast follow after webcam-to-Remix is working.
+* Keep the local worker as a process that pushes observations to Remix, not as a separate Python web server.
+* Use BAML/Kimi as the intended chat stack, with Fireworks Kimi configured through `FIREWORKS_API_KEY`.
+* Use `accounts/fireworks/models/kimi-k2p6` as the default Kimi model.
+* Keep conservative fallback behavior for chat and detection so the demo works even when model setup is incomplete.
 
 ---
 
@@ -54,7 +99,7 @@ The system should behave like a “robot” because it closes a perception → i
 
 ## 3.2 Divot principle
 
-Like a golf swing coach, ChickCoach watches the activity and explains what it sees.
+Like a golf swing coach, BroodCast watches the activity and explains what it sees.
 
 For chicks, that means:
 
@@ -116,7 +161,7 @@ Needs:
 
 ## Public live viewer
 
-1. As a visitor, I can open `/live` and see the latest annotated brooder image.
+1. As a visitor, I can open `/chickcheck/live` and see the latest annotated brooder image.
 2. As a visitor, I can see where each chick currently appears to be.
 3. As a visitor, I can see a comfort score and recent activity summary.
 4. As a visitor, I can ask, “Are the chicks too cold?” and receive a grounded answer based on recent observations.
@@ -152,7 +197,7 @@ Needs:
 * Chick zone labels.
 * Comfort score.
 * Recent stats.
-* Chatbot panel: “Ask ChickCoach.”
+* Chatbot panel: “Ask BroodCast.”
 
 ### Admin `/dashboard`
 
@@ -219,7 +264,7 @@ The system must never:
 
 Display on `/live` and `/dashboard`:
 
-> ChickCoach is an observational learning tool. It does not replace adult supervision. Always directly check food, water, temperature, bedding, and chick behavior.
+> BroodCast is an observational learning tool. It does not replace adult supervision. Always directly check food, water, temperature, bedding, and chick behavior.
 
 ## 7.3 Required agent behavior
 
@@ -244,7 +289,7 @@ Set `safety_level = "adult_attention"` when the user asks about or the observati
 Create `docs/SAFETY.md` with:
 
 ```md
-# ChickCoach Safety Rules
+# BroodCast Safety Rules
 
 - This system is observational only.
 - It does not control heat, food, water, doors, motors, lights, or any physical actuator.
@@ -329,7 +374,7 @@ Runs:
 
 ## 9.3 Storage
 
-For weekend MVP, choose one:
+Original production-oriented options:
 
 ### Option A: Postgres + local mounted Fly volume
 
@@ -348,24 +393,35 @@ Recommended for speed:
 
 Clean production-ish split, more setup.
 
-Recommended weekend path: **Supabase + Fly.io Remix app**.
+Original recommended weekend path: **Supabase + Fly.io Remix app**.
+
+Current selected path: **local JSON-backed file/in-memory storage + Remix app**.
+
+Reason: the immediate priority is proving the product loop:
+
+```text
+webcam snapshot → local worker analysis → Remix ingest → live view → chat explanation → report
+```
+
+Supabase/Postgres can replace the local store after the loop is working.
 
 ---
 
 # 10. Pages and routes
 
+Current route namespace: BroodCast is mounted under `/chickcheck` so the original RoboSteading
+homepage can remain at `/`.
+
 ## 10.1 `/`
 
-Landing page.
+RoboSteading landing page with a link to BroodCast.
 
 Content:
 
-* Product name: ChickCoach Live.
-* Short explanation.
-* Link to `/live`.
-* Safety note.
+* Existing RoboSteading mission content.
+* Link to `/chickcheck`.
 
-## 10.2 `/live`
+## 10.2 `/chickcheck/live`
 
 Public page.
 
@@ -374,7 +430,7 @@ Components:
 * `LiveStream`
 * `ChickOverlay`
 * `ChickStatsCards`
-* `AskChickCoach`
+* `AskBroodCast`
 * `SafetyBanner`
 * `RecentObservations`
 
@@ -396,7 +452,7 @@ If stale:
 Stream may be stale. Last observation was 12 minutes ago.
 ```
 
-## 10.3 `/dashboard`
+## 10.3 `/chickcheck/dashboard`
 
 Admin-only.
 
@@ -410,7 +466,7 @@ Components:
 * Stream health card.
 * Report generation link.
 
-## 10.4 `/report`
+## 10.4 `/chickcheck/report`
 
 Public or admin-shareable report page.
 
@@ -424,7 +480,7 @@ Shows:
 * Manual notes.
 * Kid-friendly summary.
 
-## 10.5 `/login`
+## 10.5 `/chickcheck/login`
 
 Magic-link login page.
 
@@ -436,7 +492,9 @@ Fields:
 
 ## 10.6 `/auth/callback`
 
-Handles magic-link callback.
+Production target: handles magic-link callback.
+
+Current weekend implementation: not used because admin access is a temporary token gate.
 
 ---
 
@@ -760,21 +818,29 @@ This is not a health score. Label it as **comfort signal**, not medical status.
 
 ## 14.1 Agent name
 
-**Ask ChickCoach**
+**Ask BroodCast**
 
 ## 14.2 Model
 
-Use **Kimi K2.5** through an OpenAI-compatible endpoint.
+Use **Kimi K2.5/Kimi K2.6** through Fireworks.
 
 Environment variables:
 
 ```bash
-KIMI_BASE_URL=
-KIMI_API_KEY=
-KIMI_MODEL=
+FIREWORKS_API_KEY=
+KIMI_BASE_URL=https://api.fireworks.ai/inference/v1
+KIMI_MODEL=accounts/fireworks/models/kimi-k2p6
 ```
 
-The implementation should not hardcode the exact model string. It should be configurable.
+The implementation should keep the model configurable, but the default for this build is
+`accounts/fireworks/models/kimi-k2p6`.
+
+Current runtime note:
+
+* The app currently calls the Fireworks completions endpoint directly.
+* BAML files are included as the intended prompt/schema source.
+* If the Fireworks call fails, the app uses a conservative local fallback answer with the same
+  response shape.
 
 ## 14.3 BAML files
 
@@ -791,7 +857,7 @@ client<llm> Kimi {
   provider "openai-generic"
   options {
     base_url env.KIMI_BASE_URL
-    api_key env.KIMI_API_KEY
+    api_key env.FIREWORKS_API_KEY
     model env.KIMI_MODEL
   }
 }
@@ -828,7 +894,7 @@ function AnswerChickQuestion(
 ) -> ChickAnswer {
   client Kimi
   prompt #"
-    You are ChickCoach, a cautious educational assistant for a temporary chick brooder.
+    You are BroodCast, a cautious educational assistant for a temporary chick brooder.
 
     Your job:
     - Answer questions about the chicks using the latest observations.
@@ -901,11 +967,15 @@ Keep snippets short. Do not make the model rely on internet access during the we
 
 ## 15.1 Requirement
 
-Use magic-link login for admin functionality.
+Production target: use magic-link login for admin functionality.
+
+Current weekend implementation: use a temporary password/token gate.
 
 ## 15.2 Recommended implementation
 
-Use Supabase Auth magic links for fastest implementation.
+Original recommendation: use Supabase Auth magic links.
+
+Current selected implementation: use `ADMIN_TOKEN` for a simple admin session cookie.
 
 Admin-only routes:
 
@@ -968,12 +1038,12 @@ type ChickStatsCardsProps = {
 };
 ```
 
-## 16.3 `AskChickCoach`
+## 16.3 `AskBroodCast`
 
 Props:
 
 ```ts
-type AskChickCoachProps = {
+type AskBroodCastProps = {
   sessionId: string;
 };
 ```
@@ -1020,7 +1090,7 @@ chickcoach-live/
     web/
       app/
         components/
-          AskChickCoach.tsx
+          AskBroodCast.tsx
           ChickOverlay.tsx
           ChickStatsCards.tsx
           LiveStream.tsx
@@ -1088,19 +1158,25 @@ chickcoach-live/
 ## Web app
 
 ```bash
-DATABASE_URL=
-SESSION_SECRET=
 APP_URL=
 
+ADMIN_TOKEN=
+
+FIREWORKS_API_KEY=
+KIMI_BASE_URL=https://api.fireworks.ai/inference/v1
+KIMI_MODEL=accounts/fireworks/models/kimi-k2p6
+
+STREAM_INGEST_TOKEN=
+```
+
+Production fast-follow variables, when replacing local storage/auth:
+
+```bash
+DATABASE_URL=
+SESSION_SECRET=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-
-KIMI_BASE_URL=
-KIMI_API_KEY=
-KIMI_MODEL=
-
-STREAM_INGEST_TOKEN=
 ADMIN_EMAILS=
 ```
 
@@ -1169,7 +1245,7 @@ Acceptance criteria:
 * Implement `AnswerChickQuestion`.
 * Add static chick-care KB.
 * Add `/api/chat`.
-* Add `AskChickCoach` component.
+* Add `AskBroodCast` component.
 
 Acceptance criteria:
 
@@ -1308,7 +1384,7 @@ Visual style:
 Suggested copy:
 
 ```text
-ChickCoach Live
+BroodCast Live
 
 A tiny observational farm robot for learning how chicks behave.
 
@@ -1405,4 +1481,32 @@ The project is done for the weekend when:
 * No unsafe automation exists.
 * The class can see a simple report explaining what happened over the weekend.
 
+---
 
+# 26. Next work: Python webcam and model worker
+
+The next development priority is the Python side of the system.
+
+Goal:
+
+> Make the local Python worker reliably turn webcam frames into useful BroodCast observations.
+
+Work next on:
+
+* Confirming webcam capture works on the target laptop.
+* Adding a simple preview/debug mode so camera framing can be adjusted quickly.
+* Saving raw and annotated frames locally for troubleshooting.
+* Making zone calibration practical, likely by editing `services/inference/zones.json` against a real frame.
+* Replacing the fake detector in `services/inference/falcon_segment.py` with the first Falcon-Perception integration.
+* Keeping a manual/fake detector fallback so the Remix app remains usable while model setup is in progress.
+* Improving activity scoring from centroid movement across recent frames.
+* Making push failures visible and recoverable instead of silently losing frames.
+* Documenting the exact worker startup command for real webcam mode and fake-camera mode.
+
+Acceptance criteria for the next pass:
+
+* The worker can run for at least 10 minutes without crashing.
+* `/chickcheck/live` updates from real webcam snapshots.
+* Annotated frames show chick boxes, labels, and zones.
+* Observation JSON includes chick count, centroid, zone, activity, confidence, comfort signal, and summary.
+* If Falcon-Perception fails, the worker continues using a fallback path and the web app shows stale or degraded data clearly.

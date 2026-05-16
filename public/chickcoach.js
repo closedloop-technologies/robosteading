@@ -8,6 +8,8 @@ const staleWarning = document.querySelector('#stale-warning')
 const statsCards = document.querySelector('#stats-cards')
 const chatForm = document.querySelector('#chat-form')
 const chatAnswer = document.querySelector('#chat-answer')
+let latestRequestedAt = 0
+let latestAppliedAt = 0
 
 function metric(label, value) {
   return `<div class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
@@ -33,17 +35,29 @@ function escapeHtml(value) {
 async function refreshLatest() {
   if (!statsCards) return
 
-  const response = await fetch(latestUrl, { headers: { accept: 'application/json' } })
+  const response = await fetch(latestUrl, { cache: 'no-store', headers: { accept: 'application/json' } })
   if (!response.ok) return
   const payload = await response.json()
   const observation = payload.observation
 
   if (!observation) return
+  const observedAt = Date.parse(observation.observed_at)
+  if (!Number.isFinite(observedAt) || observedAt <= latestRequestedAt) return
+  latestRequestedAt = observedAt
 
   if (observation.annotated_frame_url && liveImage) {
-    liveImage.src = `${observation.annotated_frame_url}?t=${encodeURIComponent(observation.observed_at)}`
-    liveImage.classList.remove('hidden')
-    if (liveEmpty) liveEmpty.classList.add('hidden')
+    const imageUrl = `${observation.annotated_frame_url}?observation=${encodeURIComponent(observation.id)}&t=${Date.now()}`
+    const nextImage = new Image()
+    nextImage.onload = () => {
+      if (observedAt !== latestRequestedAt || observedAt <= latestAppliedAt) return
+      latestAppliedAt = observedAt
+      liveImage.src = imageUrl
+      liveImage.classList.remove('hidden')
+      if (liveEmpty) liveEmpty.classList.add('hidden')
+    }
+    nextImage.src = imageUrl
+  } else {
+    latestAppliedAt = observedAt
   }
 
   const stats = observation.stats || {}
@@ -110,4 +124,4 @@ if (chatForm && chatAnswer) {
 }
 
 refreshLatest()
-setInterval(refreshLatest, 4000)
+setInterval(refreshLatest, 1000)

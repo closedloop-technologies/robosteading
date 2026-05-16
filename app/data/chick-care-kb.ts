@@ -4,5 +4,5 @@ export const chickCareKnowledge = [
   'Staying far away from the heat source for a long time can be a sign that the brooder is too warm.',
   'Loud constant peeping, lethargy, injury, trouble breathing, wet bedding, or a chick being stuck should get adult attention.',
   'Food, water, bedding, temperature, and chick behavior should always be checked directly by a human caregiver.',
-  'ChickCoach cannot diagnose health problems and does not replace adult supervision.',
+  'BroodCast cannot diagnose health problems and does not replace adult supervision.',
 ]

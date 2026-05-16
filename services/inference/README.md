@@ -6,10 +6,12 @@ It currently:
 
 - Captures one frame per loop with OpenCV.
 - Falls back to a generated test frame if webcam capture fails.
-- Uses a fake detector shaped like the Falcon-Perception output.
+- Uses Falcon-Perception, manual boxes from an env var, or a fake detector fallback.
 - Assigns detections to configured zones.
 - Draws annotations.
 - Pushes observation JSON and the latest annotated JPEG to `/api/ingest/observation`.
+- Can save raw/annotated debug frames and run a finite smoke test.
+- Keeps running when detection or push fails so the next frame can recover.
 
 Run it after the Remix app is running:
 
@@ -20,5 +22,72 @@ pip install -r requirements.txt
 CHICKCOACH_API_URL=http://localhost:44100 STREAM_INGEST_TOKEN=dev-stream-token python main.py
 ```
 
-Replace `falcon_segment.py` with the Falcon-Perception implementation when the local model runtime
-is ready.
+Run it in Docker with the brooder camera:
+
+```sh
+docker build -t chickcoach-inference .
+docker run --rm \
+  --device=/dev/video2:/dev/video2 \
+  --add-host=host.docker.internal:host-gateway \
+  -e CAMERA_INDEX=2 \
+  -e CHICKCOACH_API_URL=http://host.docker.internal:44100 \
+  -e STREAM_INGEST_TOKEN=dev-stream-token \
+  -e CHICKCOACH_DETECTOR=yolo \
+  -e YOLO_CLASS_IDS=14 \
+  -e YOLO_CONFIDENCE=0.03 \
+  -e YOLO_IMAGE_SIZE=960 \
+  chickcoach-inference
+```
+
+Useful weekend test modes:
+
+```sh
+# Run five fake-camera frames, save raw and annotated images under debug_frames/.
+CHICKCOACH_FAKE_CAMERA=1 CHICKCOACH_SAVE_FRAMES=1 CHICKCOACH_MAX_FRAMES=5 python main.py
+
+# Show a local OpenCV preview window while pushing frames.
+CHICKCOACH_PREVIEW=1 python main.py
+
+# Override fake detection boxes for calibration against a real frame.
+CHICKCOACH_DETECTIONS_JSON='[
+  {"track_id":"chick_1","bbox":[180,160,250,235],"confidence":0.9},
+  {"track_id":"chick_2","bbox":[520,320,590,395],"confidence":0.9}
+]' python main.py
+
+# Run Falcon-Perception 300M detection against the real webcam, with fake fallback if model inference fails.
+CHICKCOACH_DETECTOR=falcon FALCON_MODEL=tiiuae/Falcon-Perception-300M python main.py
+
+# Practical local detector fallback. COCO class 14 is "bird"; set YOLO_CLASS_IDS=all to inspect all classes.
+CHICKCOACH_DETECTOR=yolo YOLO_MODEL=yolov8n.pt python main.py
+```
+
+Environment variables:
+
+- `CHICKCOACH_API_URL`: Remix app base URL. Defaults to `http://localhost:44100`.
+- `STREAM_INGEST_TOKEN`: Bearer token for `/api/ingest/observation`.
+- `CAMERA_INDEX`: OpenCV camera index. Defaults to `0`.
+- `CAPTURE_INTERVAL_SECONDS`: seconds between frames. Defaults to `3`.
+- `CHICKCOACH_FAKE_CAMERA=1`: skip webcam capture and generate a moving test frame.
+- `CHICKCOACH_DETECTOR`: `fake` by default; set to `falcon` to run Falcon-Perception or `yolo` for a lightweight local detector.
+- `CHICKCOACH_FALLBACK_DETECTOR`: `fake` by default; set to `none` to fail instead of falling back.
+- `CHICKCOACH_DETECTION_PROMPTS`: comma-separated prompt list. Defaults to `baby chick,white chick,baby chicken,small white bird`.
+- `CHICKCOACH_SAVE_FRAMES=1`: save raw and annotated frames.
+- `CHICKCOACH_SAVE_FRAME_HISTORY=1`: save timestamped debug frames in addition to `latest_raw.jpg` and `latest_annotated.jpg`.
+- `CHICKCOACH_DEBUG_DIR`: debug frame directory. Defaults to `debug_frames`.
+- `CHICKCOACH_PREVIEW=1`: open a local OpenCV preview window.
+- `CHICKCOACH_MAX_FRAMES`: stop after this many frames, useful for smoke tests.
+- `CHICKCOACH_DETECTIONS_JSON`: manual detection boxes while calibrating zones or replacing the detector.
+- `FALCON_MODEL`: Hugging Face model id. Defaults to `tiiuae/Falcon-Perception-300M`.
+- `FALCON_DEVICE_MAP`: device passed to Transformers. Defaults to `cuda` when available, otherwise `cpu`.
+- `FALCON_DTYPE`: `auto`, `float16`, `bfloat16`, or `float32`. Defaults to `auto`.
+- `FALCON_TASK`: task passed to `model.generate`. Defaults to `detection`.
+- `FALCON_MIN_DIMENSION` / `FALCON_MAX_DIMENSION`: image resize bounds for generation.
+- `FALCON_COMPILE=0`: disables the model's first-run compile path.
+- `YOLO_MODEL`: model file/name for Ultralytics. Defaults to `yolov8n.pt`.
+- `YOLO_CLASS_IDS`: comma-separated COCO class IDs. Defaults to `14` for bird. Use `all` to keep all detections.
+- `YOLO_CONFIDENCE`: confidence threshold. Defaults to `0.15`.
+- `YOLO_IMAGE_SIZE`: inference image size. Defaults to `640`.
+- `YOLO_MAX_DETECTIONS`: max boxes to pass through. Defaults to `8`.
+
+Falcon-Perception is loaded lazily on the first frame. The first run may download model weights and
+compile kernels, so expect it to be much slower than later frames.

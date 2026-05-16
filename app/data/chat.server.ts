@@ -50,7 +50,7 @@ async function answerWithKimi(
   recent: Observation[],
   notes: ManualNote[],
 ) {
-  let prompt = `You are ChickCoach, a cautious educational assistant for a temporary chick brooder.
+  let prompt = `You are BroodCast, a cautious educational assistant for a temporary chick brooder.
 
 Return only JSON with these fields: answer, confidence, safety_level, suggested_checks, evidence, follow_up_questions.
 confidence must be low, medium, or high. safety_level must be normal, check_now, or adult_attention.

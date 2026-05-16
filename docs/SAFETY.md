@@ -1,4 +1,4 @@
-# ChickCoach Safety Rules
+# BroodCast Safety Rules
 
 - This system is observational only.
 - It does not control heat, food, water, doors, motors, lights, or any physical actuator.

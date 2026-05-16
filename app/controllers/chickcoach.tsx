@@ -27,7 +27,7 @@ export const live = {
     let recent = await listObservations(30)
     let visible = await isPublicVisible()
     return render(
-      <PageShell title="ChickCoach Live" description="Near-live chick brooder observations.">
+      <PageShell title="BroodCast Live" description="A window into the secret life of chicks.">
         <LivePage latest={latest} recent={recent} visible={visible} />
       </PageShell>,
       request,
@@ -44,7 +44,7 @@ export const dashboard = {
     let zones = await getZones()
     let visible = await isPublicVisible()
     return render(
-      <PageShell title="ChickCoach Dashboard" description="Admin dashboard for ChickCoach Live.">
+      <PageShell title="BroodCast Dashboard" description="Admin dashboard for BroodCast.">
         <DashboardPage
           latest={latest}
           recent={recent}
@@ -62,9 +62,9 @@ export const login = {
   async handler({ request, url }: { request: Request; url: URL }) {
     let failed = url.searchParams.get('error') === '1'
     return render(
-      <PageShell title="ChickCoach Login" description="Admin access for ChickCoach Live.">
+      <PageShell title="BroodCast Login" description="Admin access for the BroodCast stream.">
         <section className="cc-section narrow">
-          <h1>Admin Login</h1>
+          <h1>BroodCast Login</h1>
           <p className="muted">Use the temporary weekend admin token.</p>
           {failed ? <p className="form-error">That token did not match.</p> : null}
           <form className="stack-form" method="post" action="/chickcheck/login">
@@ -105,7 +105,7 @@ export const report = {
     let observations = await allObservations()
     let notes = await listManualNotes({ includePrivate: isAdminRequest(request) })
     return render(
-      <PageShell title="ChickCoach Report" description="Weekend chick care report.">
+      <PageShell title="BroodCast Report" description="Weekend chick care report.">
         <ReportPage observations={observations} notes={notes} />
       </PageShell>,
       request,
@@ -231,11 +231,12 @@ function LivePage() {
       <SafetyBanner />
       <div className="hero-row">
         <div>
-          <p className="eyebrow">Near-live brooder view</p>
-          <h1>ChickCoach Live</h1>
+          <p className="eyebrow">Tune in to the Secret Life of Chicks</p>
+          <h1>BroodCast Live</h1>
           <p className="lead">
-            A tiny observational farm robot for learning how chicks behave. It watches, labels, and
-            explains. Humans still do the care.
+            A tiny window into the world of our growing flock. BroodCast uses computer vision to
+            watch, label, and explain what the chicks are doing—helping us become more attentive
+            stewards while the chicks do their thing.
           </p>
         </div>
         <a className="btn btn-secondary" href="/chickcheck/report">
@@ -250,10 +251,10 @@ function LivePage() {
           <div id="stale-warning" className="stale-warning hidden"></div>
           <div className="stream-frame">
             {latest?.annotated_frame_url ? (
-              <img id="live-image" src={latest.annotated_frame_url} alt="Latest annotated brooder frame" />
+              <img id="live-image" src={latest.annotated_frame_url} alt="Latest annotated BroodCast frame" />
             ) : (
               <div id="live-empty" className="empty-frame">
-                Waiting for webcam worker...
+                Waiting for the BroodCast to begin...
               </div>
             )}
           </div>
@@ -265,7 +266,7 @@ function LivePage() {
           <div id="stats-cards" className="stats-grid">
             <StatsCards observation={latest} />
           </div>
-          <h3>Ask ChickCoach</h3>
+          <h3>Ask BroodCast</h3>
           <ChatBox />
         </aside>
       </div>
@@ -274,7 +275,7 @@ function LivePage() {
         <h2>Recent Observations</h2>
         <ObservationTable observations={recent.slice(0, 8)} />
       </section>
-      <script src="/chickcoach.js"></script>
+      <script src="/chickcoach.js?v=live-refresh-2"></script>
     </section>
   )
 }
@@ -285,9 +286,9 @@ function DashboardPage() {
       <SafetyBanner />
       <div className="hero-row">
         <div>
-          <p className="eyebrow">Admin</p>
-          <h1>Dashboard</h1>
-          <p className="lead">Review stream health, add care notes, and tune zone config.</p>
+          <p className="eyebrow">Admin Console</p>
+          <h1>BroodCast Dashboard</h1>
+          <p className="lead">Manage your stream, review care notes, and tune the vision system.</p>
         </div>
         <form method="post" action="/chickcheck/logout">
           <button className="btn btn-secondary" type="submit">
@@ -320,7 +321,7 @@ function DashboardPage() {
           <form className="stack-form" method="post" action="/chickcheck/api/manual-notes">
             <label>
               Note
-              <textarea name="note" rows={4} required></textarea>
+              <textarea name="note" rows={4} required placeholder="e.g., Refilled water, checked heat lamp..."></textarea>
             </label>
             <label>
               Visibility
@@ -342,7 +343,7 @@ function DashboardPage() {
           </div>
         </section>
         <section className="panel">
-          <h2>Zone Config</h2>
+          <h2>Vision Config</h2>
           <form className="stack-form" method="post" action="/chickcheck/api/zones">
             <textarea name="zones" rows={12}>{JSON.stringify(zones, null, 2)}</textarea>
             <button className="btn btn-primary" type="submit">
@@ -368,8 +369,8 @@ function ReportPage() {
         <div className="hero-row">
           <div>
             <p className="eyebrow">Class report</p>
-            <h1>Weekend Chick Care Report</h1>
-            <p className="lead">A plain-language summary from ChickCoach observations and care notes.</p>
+            <h1>BroodCast Weekend Report</h1>
+            <p className="lead">A summary of life in the brooder, from computer vision and care notes.</p>
           </div>
           <a className="btn btn-secondary print-button" href="javascript:window.print()">
             Print
@@ -378,20 +379,20 @@ function ReportPage() {
         <div className="stats-grid report-stats">
           <Metric label="Total observations" value={String(report.total)} />
           <Metric label="Average comfort signal" value={report.averageComfort} />
-          <Metric label="Most common zone" value={report.topZone} />
-          <Metric label="Manual notes" value={String(notes.length)} />
+          <Metric label="Primary zone" value={report.topZone} />
+          <Metric label="Care events" value={String(notes.length)} />
         </div>
         <section className="panel">
-          <h2>What We Learned</h2>
+          <h2>The Big Picture</h2>
           <p>
-            The chicks were observed through snapshots and simple zone labels. ChickCoach looked for
-            where they spent time, how much movement was detected, and whether any advisory alerts
-            appeared. These signals help people ask better care questions, but adults still check
-            food, water, temperature, bedding, and behavior directly.
+            Over the weekend, we watched the chicks through snapshots and automated zone detection.
+            By tracking where they spent their time and how much they moved, BroodCast helped us
+            stay attentive to their comfort. This report summarizes those patterns, but human eyes
+            always have the final say on food, water, and well-being.
           </p>
         </section>
         <section className="panel">
-          <h2>Manual Care Notes</h2>
+          <h2>Care Logs</h2>
           {notes.length === 0 ? <p className="muted">No manual notes yet.</p> : null}
           {notes.map((note: any) => (
             <p key={note.id}>
@@ -400,7 +401,7 @@ function ReportPage() {
           ))}
         </section>
         <section className="panel">
-          <h2>Recent Evidence</h2>
+          <h2>Evidence Log</h2>
           <ObservationTable observations={observations.slice(0, 12)} />
         </section>
       </section>
@@ -439,7 +440,7 @@ function ChatBox() {
           <button type="button" data-prompt="What should we check before bedtime?">Bedtime checks</button>
         </div>
         <button className="btn btn-primary" type="submit">
-          Ask ChickCoach
+          Ask BroodCast
         </button>
       </form>
       <div id="chat-answer" className="chat-answer muted">Answers will appear here.</div>

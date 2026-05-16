@@ -108,7 +108,7 @@ function HomePage() {
             </p>
             <div className="hero-actions">
               <a href="/chickcheck" className="btn btn-primary">
-                Open ChickCoach Live →
+                Open BroodCast Live →
               </a>
               <a href="#inquire" className="btn btn-primary" id="hero-cta">
                 Explore Setup →
