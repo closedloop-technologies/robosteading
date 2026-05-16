@@ -1,5 +1,5 @@
 /* ============================================
-   JustBuild.ai — Premium Domain Landing Page
+   RoboSteading — AI Homestead Automation Landing Page
    Design System & Styles
    ============================================ */
 
@@ -813,8 +813,8 @@ ul {
    SCROLL ANIMATIONS
    ============================== */
 .reveal {
-  opacity: 0;
-  transform: translateY(30px);
+  opacity: 1;
+  transform: translateY(0);
   transition:
     opacity 0.7s ease,
     transform 0.7s ease;
@@ -827,8 +827,8 @@ ul {
 
 /* stagger children */
 .reveal-stagger > * {
-  opacity: 0;
-  transform: translateY(20px);
+  opacity: 1;
+  transform: translateY(0);
   transition:
     opacity 0.5s ease,
     transform 0.5s ease;

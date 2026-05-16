@@ -1,24 +1,40 @@
 # RoboSteading
 
-This is the repository for the RoboSteading static site and DNS configuration.
+RoboSteading is a Remix-powered site for AI automation on the modern homestead.
 
-## Environment Setup
+## App Shape
 
-Environment variables are securely managed in 1Password. To preview or push changes, you must authenticate with the 1Password CLI (`op`) and use `op run`.
+- `app/controllers/home.tsx` renders the landing page.
+- `app/routes.ts` defines the route contract.
+- `app/router.ts` wires Remix routes and static file middleware.
+- `app/utils/render.tsx` centralizes HTML response rendering.
+- `public/` contains browser assets, favicons, `robots.txt`, `sitemap.xml`, and CSS.
+- `dnsconfig.js` contains the DNSControl configuration for `robosteading.com`.
 
-1. Ensure you have the [1Password CLI](https://developer.1password.com/docs/cli) installed and are signed in.
-2. The `.env` file contains secret references pointing to the `Dev_Environments` vault.
+## Requirements
 
-## Usage
+Use Node 24 or newer. With `nvm`:
 
-To preview DNS changes locally:
-
-```bash
-op run --env-file .env -- dnscontrol preview
+```sh
+nvm use
+npm install
 ```
 
-To push DNS changes:
+## Commands
 
-```bash
+```sh
+npm run dev
+npm run start
+npm test
+npm run typecheck
+```
+
+## DNS
+
+Environment variables are managed outside Git. To preview or push DNS changes, authenticate with
+the 1Password CLI and run:
+
+```sh
+op run --env-file .env -- dnscontrol preview
 op run --env-file .env -- dnscontrol push
 ```
