@@ -5,7 +5,7 @@ description: DNS and Infrastructure Configuration for RoboSteading
 
 # DNS & Infrastructure Configuration
 
-This skill documents the DNS, Cloudflare, and GitHub Pages configuration for `robosteding.com` and the process we took to build it.
+This skill documents the DNS, Cloudflare, and GitHub Pages configuration for `robosteading.com` and the process we took to build it.
 
 ## 1. Cloudflare Configuration (DNSControl)
 
@@ -24,7 +24,7 @@ var REG_NONE = NewRegistrar("none");
 var CF = NewDnsProvider("cloudflare");
 
 D(
-  "robosteding.com",
+  "robosteading.com",
   REG_NONE,
   DnsProvider(CF),
   A("@", "185.199.108.153"),
