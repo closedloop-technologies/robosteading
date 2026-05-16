@@ -154,13 +154,24 @@ Core long-term assumptions:
 
 ## Primary goal
 
-Build a working public web app this weekend where parents, kids, and classmates can:
+Build a working public web app this weekend where parents, kids, classmates, and a broader
+education-friendly audience can:
 
 1. View a near-live annotated webcam feed of the chicks.
-2. See simple comfort/activity stats.
+2. See whether the household is following the classroom chick care agreement.
 3. Ask a chatbot questions about what the chicks are doing.
 4. Generate a simple “weekend chick care report.”
 5. See chick peep activity over time without streaming household audio or human voices.
+
+The top-level product question is not "Are the chicks happy?" as a vague metric. BroodCast should
+optimize for:
+
+```text
+Are we following the classroom care agreement?
+```
+
+The comfort score remains useful as a supporting observation signal, but care compliance is the
+primary product surface.
 
 ## Secondary goal
 
@@ -263,6 +274,34 @@ replace caregiver review for safety-relevant labels. Training should prioritize 
 low confidence frames, model disagreements, new camera angles, unusual events, edge cases, and
 examples that affect reported statistics.
 
+## 3.7 Classroom care agreement principle
+
+The operational rules for this build come from the **Classroom Chick Care Agreement (Silkie Chicks -
+11 Days Old)** sheet. BroodCast should encode sections 1-12 as checklist items, reminders, report
+evidence, and chat-agent rules:
+
+1. Heat.
+2. Food and water.
+3. Safe environment.
+4. Handling.
+5. Siblings.
+6. Outdoor time.
+7. Indoor safety.
+8. Nighttime routine.
+9. Cleaning.
+10. Transport back to school.
+11. Never leave unattended.
+12. Take pictures and have fun.
+
+The app should treat camera monitoring as a care aid, not adult supervision. It should explicitly
+say:
+
+```text
+Camera monitoring does not count as adult supervision. Please check the chicks directly.
+```
+
+The most important compliance rule is: never leave the chicks unattended.
+
 ---
 
 # 4. Target users
@@ -329,6 +368,11 @@ Needs:
 9. As an admin, I can attach a camera to a location and recalibrate zones when the camera moves.
 10. As an admin, I can name chickens and correct uncertain identity labels without requiring the
     system to be certain on every frame.
+11. As an admin, I can complete a care checklist based on the classroom care agreement.
+12. As an admin, I can record water, food, heat, bedding, pet-safety, handling, outdoor-time,
+    nighttime, cleaning, transport, and adult-check events.
+13. As an admin, I can see reminders when water, food, or adult checks have not been confirmed
+    recently.
 
 ## Local system operator
 
@@ -402,6 +446,8 @@ Scope:
   spectrum.
 * Keep the score label as "comfort score" in user-facing UI, with supporting safety copy that it is
   not a health diagnosis.
+* Add a Care Checklist panel driven by the classroom care agreement.
+* Make compliance status more prominent than the comfort score.
 * Keep chatbot access public for the demo, with conservative safety escalation and no medical
   claims.
 * Make the report kid-friendly and classroom-shareable.
@@ -411,6 +457,7 @@ Scope:
 Exit criteria:
 
 * A viewer can understand what BroodCast sees without admin context.
+* The dashboard answers "Are we following the classroom care agreement?"
 * The public page has no raw audio playback or download affordance.
 * The page remains useful when the worker is stale or temporarily offline.
 * The report can be shared with a teacher without overclaiming model accuracy.
@@ -446,6 +493,7 @@ Scope:
 
 * Add stronger gated admin access, likely magic-link auth or equivalent.
 * Keep public viewing open by default, but support gated/private mode.
+* Persist structured care-compliance events and checklist state.
 * Replace JSON-only zone editing with a visual calibration UI.
 * Add location, camera, camera attachment, calibration version, model version, and view-health
   fields to observations.
@@ -503,9 +551,437 @@ Exit criteria:
 
 ---
 
-# 7. Safety requirements
+# 7. Classroom Care Compliance
 
-## 7.1 Hard safety constraints
+BroodCast should encode the classroom care sheet as a concrete compliance model. For MVP, most
+checks are manual buttons or checklist items. Vision and audio can provide supporting cues, but the
+app should not rely on model output alone for care compliance.
+
+## 7.1 Compliance metrics
+
+### Heat source active
+
+The care sheet says to plug in the heat lamp as soon as the chicks arrive home and keep the chicks
+warm. In the current setup, this maps to the heating plate, not a lamp.
+
+Metric:
+
+```text
+heat_source_status: active | unknown | needs_check
+```
+
+MVP measurement:
+
+* Manual check: parent confirms the heat source is plugged in and working.
+* Optional sensor: temperature near the heater zone.
+* Vision cue: chicks spending too much time huddled near the heater may indicate cold.
+
+Dashboard card:
+
+```text
+Heat: Checked / Needs check
+```
+
+### Fresh water available
+
+Metric:
+
+```text
+water_check_status: checked | needs_check
+last_water_check_at: timestamp
+```
+
+MVP measurement:
+
+* Manual button: "Water checked."
+* Optional vision: waterer present, but do not rely on it.
+
+Reminder rule:
+
+```text
+If last_water_check_at > 4 hours ago -> remind adult to check water.
+```
+
+### Chick mash available
+
+Metric:
+
+```text
+food_check_status: checked | needs_check
+last_food_check_at: timestamp
+```
+
+MVP measurement:
+
+* Manual button: "Food checked."
+* Optional vision: feeder visible or chicks near feeder.
+
+Reminder rule:
+
+```text
+If last_food_check_at > 4 hours ago -> remind adult to check food.
+```
+
+### No unauthorized food
+
+Printed instruction: do not give the chicks any other food. The handwritten note says corn cobs and
+watermelon rinds are okay. Treat this as:
+
+```text
+default_rule: chick mash only
+teacher_exception: corn cobs and watermelon rinds appear approved by handwritten note
+```
+
+Metric:
+
+```text
+extra_food_given: none | corn_cob | watermelon_rind | other
+```
+
+Required app wording:
+
+```text
+Default rule: only chick mash. The care sheet has a handwritten exception saying corn cobs and
+watermelon rinds are okay. Do not give any other food unless an adult confirms with the teacher.
+```
+
+### Secure enclosure and indoor safety
+
+Metrics:
+
+```text
+enclosure_status: secure | needs_check | unknown
+indoor_roaming_status: not_roaming | unknown | violation
+```
+
+MVP measurement:
+
+* Manual check.
+* Optional camera cue: chicks detected inside brooder zones.
+
+Alert rule:
+
+```text
+If chick_count < 2 for repeated frames -> "Check that both chicks are safely inside the bin."
+```
+
+### Warm, draft-free area
+
+Metrics:
+
+```text
+ambient_status: ok | too_cold | too_hot | unknown
+draft_risk: low | unknown
+```
+
+MVP measurement:
+
+* Temperature sensor near brooder if available.
+* Chick behavior:
+  * Both always near heater: possible cold or draft.
+  * Both far from heater: possible too warm.
+  * Normal movement across zones: likely okay.
+
+### Away from pets
+
+Metric:
+
+```text
+pet_safety_status: confirmed | needs_check
+```
+
+MVP measurement: manual only.
+
+Dashboard checkbox:
+
+```text
+[ ] Pets secured away from chicks
+```
+
+Reminder rule:
+
+```text
+If not checked recently -> show reminder, not alarm.
+```
+
+### Handling and siblings
+
+Rules:
+
+* Students must have adult supervision when holding chicks.
+* Students should sit on the ground, criss-cross, feet tucked in.
+* No walking around while holding chicks.
+* Younger siblings may hold only with 100% adult supervision.
+
+Metric:
+
+```text
+handling_mode: none | supervised | unknown
+```
+
+MVP event buttons:
+
+```text
+Started supervised handling
+Ended supervised handling
+```
+
+Required chatbot answer when asked "Can I hold them?":
+
+```text
+Yes, only with adult supervision, while sitting on the ground criss-cross with feet tucked in. Do
+not walk around while holding them.
+```
+
+### Outdoor time
+
+Rules:
+
+* Outdoor time may happen in a grassy backyard space.
+* Outdoor time must be closely supervised.
+* Never leave chicks unattended outside.
+
+Metric:
+
+```text
+location_mode: indoor_brooder | outdoor_supervised | transport | unknown
+```
+
+MVP event buttons:
+
+```text
+Outdoor supervised time started
+Outdoor supervised time ended
+```
+
+Reminder rule:
+
+```text
+If outdoor_supervised active for > 20-30 min -> remind adult to verify conditions.
+```
+
+### Nighttime routine
+
+Rule: cover the bin with the provided blanket at bedtime to help the chicks feel safe and warm.
+
+Metrics:
+
+```text
+night_cover_status: covered | not_covered | needs_check | unknown
+bedtime_check_completed: true | false
+```
+
+MVP bedtime checklist:
+
+```text
+[ ] Food checked
+[ ] Water checked
+[ ] Heater checked
+[ ] Bedding checked
+[ ] Chicks counted: 2
+[ ] Bin covered with blanket
+```
+
+If the blanket affects camera visibility, BroodCast should switch to night mode:
+
+```text
+Night mode: camera may be blocked by blanket. Use manual checks.
+```
+
+### Cleaning
+
+Rules:
+
+* Replace doggy pad papers.
+* Clean fake grass using water and a cloth only, no chemicals.
+* Shake it out and allow it to dry before placing it back.
+
+Metrics:
+
+```text
+bedding_status: clean | soiled | needs_check | unknown
+last_pad_change_at: timestamp
+fake_grass_status: clean | drying | in_brooder | unknown
+```
+
+MVP event buttons:
+
+```text
+Pad replaced
+Fake grass cleaned
+Fake grass drying
+Fake grass returned
+```
+
+Required chatbot answer when asked how to clean:
+
+```text
+Replace the doggy pad papers. Clean the fake grass with water and a cloth only. Do not use
+chemicals. Let it dry before putting it back.
+```
+
+### Transport back to school
+
+Rules:
+
+* Before returning, remove heat source, water container, and food container.
+* Place these items in the provided bag.
+* This helps keep the chicks safe during transport.
+
+Metric:
+
+```text
+return_transport_ready: true | false
+```
+
+Return checklist:
+
+```text
+[ ] Heat source removed
+[ ] Water container removed
+[ ] Food container removed
+[ ] Items placed in provided bag
+[ ] Chicks secured for transport
+```
+
+### Never unattended
+
+This is a top-level compliance principle.
+
+Metric:
+
+```text
+supervision_status: supervised | camera_only | needs_adult_check
+```
+
+Reminder rule:
+
+```text
+If no manual adult check for > 2-4 hours -> remind adult to check chicks directly.
+```
+
+## 7.2 Compliance state
+
+```ts
+type CareComplianceState = {
+  heatSource: {
+    status: "checked" | "needs_check" | "unknown";
+    lastCheckedAt?: string;
+  };
+
+  food: {
+    status: "checked" | "needs_check" | "unknown";
+    lastCheckedAt?: string;
+    extraFoodGiven?: "none" | "corn_cob" | "watermelon_rind" | "other";
+  };
+
+  water: {
+    status: "checked" | "needs_check" | "unknown";
+    lastCheckedAt?: string;
+  };
+
+  enclosure: {
+    chickCount: number | null;
+    status: "secure" | "needs_check" | "unknown";
+  };
+
+  environment: {
+    ambientStatus: "ok" | "too_cold" | "too_hot" | "unknown";
+    draftRisk: "low" | "unknown";
+  };
+
+  handling: {
+    mode: "none" | "supervised" | "unknown";
+    lastHandledAt?: string;
+  };
+
+  outdoorTime: {
+    mode: "indoor_brooder" | "outdoor_supervised" | "transport" | "unknown";
+    startedAt?: string;
+  };
+
+  cleaning: {
+    beddingStatus: "clean" | "soiled" | "needs_check" | "unknown";
+    lastPadChangeAt?: string;
+    fakeGrassStatus: "clean" | "drying" | "in_brooder" | "unknown";
+  };
+
+  nighttime: {
+    coverStatus: "covered" | "not_covered" | "needs_check" | "unknown";
+    bedtimeChecklistComplete: boolean;
+  };
+
+  supervision: {
+    lastAdultCheckAt?: string;
+    status: "supervised" | "needs_adult_check" | "unknown";
+  };
+};
+```
+
+## 7.3 Dashboard care checklist
+
+Add a **Care Checklist** panel:
+
+```text
+Daily Care
+[ ] Heat source checked
+[ ] Fresh water checked
+[ ] Chick mash checked
+[ ] Chicks counted: 2
+[ ] Enclosure secure
+[ ] Pets away
+[ ] Bedding clean
+[ ] Adult check completed
+
+Handling
+[ ] Only handled with adult supervision
+[ ] Child seated criss-cross
+[ ] No walking while holding chicks
+
+Outdoor Time
+[ ] Outdoor time supervised
+[ ] Chicks never left outside unattended
+
+Nighttime
+[ ] Food checked
+[ ] Water checked
+[ ] Heat checked
+[ ] Bedding checked
+[ ] Bin covered with blanket
+
+Cleaning
+[ ] Doggy pad replaced if needed
+[ ] Fake grass cleaned with water only
+[ ] Fake grass fully dry before returning
+
+Return to School
+[ ] Heat source removed
+[ ] Water container removed
+[ ] Food container removed
+[ ] Items placed in provided bag
+```
+
+The top-level dashboard should be compliance-first:
+
+```text
+BroodCast Compliance
+
+Current status:
+- Chicks detected: 2/2
+- Heat checked: yes
+- Water checked: 47 min ago
+- Food checked: 47 min ago
+- Last adult check: 47 min ago
+- Enclosure: secure
+- Current comfort signal: 4/5
+- Active alerts: none
+```
+
+---
+
+# 8. Safety requirements
+
+## 8.1 Hard safety constraints
 
 The system must never:
 
@@ -521,7 +997,7 @@ The system must never:
 * Stream, store, or expose raw microphone audio.
 * Store voice clips, speech transcripts, speaker identity, or other human-voice-derived content.
 
-## 7.2 Audio privacy constraints
+## 8.2 Audio privacy constraints
 
 Peep tracking must be privacy-preserving by design.
 
@@ -549,7 +1025,7 @@ Out of scope:
 * Streaming live raw audio or any representation that can reconstruct human speech.
 * Classifying human speech content.
 
-## 7.3 Video privacy and training constraints
+## 8.3 Video privacy and training constraints
 
 Video may be streamed or uploaded from the edge device to the webserver for live viewing and
 bucket-backed storage. Training use should still be consented, scoped, and model-versioned.
@@ -577,13 +1053,13 @@ Out of scope:
 * Using people or hand detections to identify a specific person.
 * Exposing person imagery or face crops publicly by default.
 
-## 7.4 Required safety banner
+## 8.4 Required safety banner
 
-Display on `/live` and `/dashboard`:
+Display on `/broodcast/live` and `/broodcast/dashboard`:
 
 > BroodCast is an observational learning tool. It does not replace adult supervision. Always directly check food, water, temperature, bedding, and chick behavior.
 
-## 7.5 Required agent behavior
+## 8.5 Required agent behavior
 
 The chatbot must always treat concerning situations conservatively.
 
@@ -603,7 +1079,7 @@ Set `safety_level = "adult_attention"` when the user asks about or the observati
 * Unusual peep patterns, such as sustained high peep rate, sudden silence after active periods, or
   peep activity that conflicts with the visual comfort signal.
 
-## 7.6 Required physical setup rules
+## 8.6 Required physical setup rules
 
 Create `docs/SAFETY.md` with:
 
@@ -622,7 +1098,7 @@ Create `docs/SAFETY.md` with:
 
 ---
 
-# 8. System architecture
+# 9. System architecture
 
 The architecture has three runtime layers:
 
@@ -705,7 +1181,7 @@ or outlier analysis is delayed. Frontier LLM vision should optimize for label qu
 examples, not for every-frame streaming inference. Audio leaving the edge device must be
 peep-filtered, voice-suppressed, and non-reconstructable as spoken language.
 
-## 8.1 Core long-term entities
+## 9.1 Core long-term entities
 
 * `family`: the account that owns locations, cameras, chickens, annotations, and models.
 * `location`: a named physical place where chickens are observed, such as a brooder, coop, run, or
@@ -731,9 +1207,9 @@ peep-filtered, voice-suppressed, and non-reconstructable as spoken language.
 
 ---
 
-# 9. Deployment architecture
+# 10. Deployment architecture
 
-## 9.1 Edge device
+## 10.1 Edge device
 
 Runs:
 
@@ -753,7 +1229,7 @@ microphone audio must be filtered locally for privacy. Only derived peep events,
 aggregate peep metrics, annotated frames, video/media allowed by configuration, and structured
 observation payloads are sent to the webserver.
 
-## 9.2 Webserver
+## 10.2 Webserver
 
 Runs:
 
@@ -769,7 +1245,7 @@ Runs:
 The webserver can run on the same edge device, another computer on the local network, or a cloud
 host such as Fly.io. It must not assume it has direct access to cameras or microphones.
 
-## 9.3 Storage and database
+## 10.3 Storage and database
 
 Original production-oriented options:
 
@@ -808,12 +1284,12 @@ Supabase/Postgres can replace the local store after the loop is working.
 
 ---
 
-# 10. Pages and routes
+# 11. Pages and routes
 
 Current route namespace: BroodCast is mounted under `/broodcast` so the original RoboSteading
 homepage can remain at `/`.
 
-## 10.1 `/`
+## 11.1 `/`
 
 RoboSteading landing page with a link to BroodCast.
 
@@ -822,7 +1298,7 @@ Content:
 * Existing RoboSteading mission content.
 * Link to `/broodcast`.
 
-## 10.2 `/broodcast/live`
+## 11.2 `/broodcast/live`
 
 Public page.
 
@@ -853,7 +1329,7 @@ If stale:
 Stream may be stale. Last observation was 12 minutes ago.
 ```
 
-## 10.3 `/broodcast/dashboard`
+## 11.3 `/broodcast/dashboard`
 
 Admin-only.
 
@@ -868,7 +1344,7 @@ Components:
 * Stream health card.
 * Report generation link.
 
-## 10.4 `/broodcast/report`
+## 11.4 `/broodcast/report`
 
 Public or admin-shareable report page.
 
@@ -883,7 +1359,7 @@ Shows:
 * Manual notes.
 * Kid-friendly summary.
 
-## 10.5 `/broodcast/login`
+## 11.5 `/broodcast/login`
 
 Magic-link login page.
 
@@ -893,7 +1369,7 @@ Fields:
 * Submit button.
 * “Check your email” confirmation state.
 
-## 10.6 `/auth/callback`
+## 11.6 `/auth/callback`
 
 Production target: handles magic-link callback.
 
@@ -901,9 +1377,9 @@ Current weekend implementation: not used because admin access is a temporary tok
 
 ---
 
-# 11. API routes
+# 12. API routes
 
-## 11.1 `POST /api/ingest/observation`
+## 12.1 `POST /api/ingest/observation`
 
 Used by the edge Python capture/inference service.
 
@@ -1032,15 +1508,15 @@ Response:
 }
 ```
 
-## 11.2 `GET /api/latest`
+## 12.2 `GET /api/latest`
 
 Returns latest observation.
 
-## 11.3 `GET /api/observations?minutes=30`
+## 12.3 `GET /api/observations?minutes=30`
 
 Returns recent observations.
 
-## 11.4 `GET /api/peeps?minutes=60`
+## 12.4 `GET /api/peeps?minutes=60`
 
 Returns recent peep activity derived from ingested observation stats.
 
@@ -1071,7 +1547,7 @@ Output:
 }
 ```
 
-## 11.5 `POST /api/chat`
+## 12.5 `POST /api/chat`
 
 Input:
 
@@ -1104,7 +1580,7 @@ Output:
 }
 ```
 
-## 11.6 `POST /api/manual-notes`
+## 12.6 `POST /api/manual-notes`
 
 Admin-only.
 
@@ -1117,13 +1593,13 @@ Input:
 }
 ```
 
-## 11.7 `GET /api/report?date=YYYY-MM-DD`
+## 12.7 `GET /api/report?date=YYYY-MM-DD`
 
 Returns report data.
 
 ---
 
-# 12. Database schema
+# 13. Database schema
 
 Use Postgres.
 
@@ -1438,9 +1914,9 @@ Example annotation labels:
 
 ---
 
-# 13. Vision worker specification
+# 14. Vision worker specification
 
-## 13.1 Location
+## 14.1 Location
 
 ```text
 services/inference/
@@ -1455,7 +1931,7 @@ services/inference/
   requirements.txt
 ```
 
-## 13.2 Worker behavior
+## 14.2 Worker behavior
 
 The edge service has three parallel responsibilities:
 
@@ -1489,7 +1965,7 @@ Annotation loop every 2–5 seconds:
 15. Select uncertain or high-value examples for local annotation/training queues without uploading
     raw media by default.
 
-## 13.3 Realtime model responsibilities
+## 14.3 Realtime model responsibilities
 
 The realtime local model path should optimize for stable statistics at household hardware speeds.
 It does not need frontier-model reasoning on every frame.
@@ -1516,7 +1992,7 @@ Required outputs over time:
 All statistics should include enough metadata to trace them back to location, camera attachment,
 calibration, and model version.
 
-## 13.4 Detection prompt
+## 14.4 Detection prompt
 
 Start with:
 
@@ -1532,7 +2008,7 @@ baby chicken
 small white bird
 ```
 
-## 13.5 Tracking
+## 14.5 Tracking
 
 Do not overbuild identity tracking for the weekend MVP.
 
@@ -1555,7 +2031,7 @@ Long term, tracking should separate temporary track IDs from named chicken ident
 match should carry confidence and evidence, and the UI should invite correction when identity is
 uncertain.
 
-## 13.6 Activity classification
+## 14.6 Activity classification
 
 Simple heuristic:
 
@@ -1565,7 +2041,7 @@ movement_delta between thresholds    => shifting
 movement_delta > threshold_high      => active
 ```
 
-## 13.7 Zone classification
+## 14.7 Zone classification
 
 Use polygon point-in-polygon.
 
@@ -1594,7 +2070,7 @@ Zones:
 }
 ```
 
-## 13.8 Comfort score heuristic
+## 14.8 Comfort score heuristic
 
 Initial simple score:
 
@@ -1613,7 +2089,7 @@ Clamp to 1–5.
 
 This is not a health score. Label it as **comfort signal**, not medical status.
 
-## 13.9 Peep event detection
+## 14.9 Peep event detection
 
 Initial implementation should be simple and inspectable.
 
@@ -1649,7 +2125,7 @@ peep_event = band_energy(1800-6500 Hz) > adaptive_noise_floor + threshold
 This detector will be imperfect. The product should present peep activity as "peep events detected"
 or "peep activity signal," not as exact vocalization counts.
 
-## 13.10 Peep comfort signal heuristic
+## 14.10 Peep comfort signal heuristic
 
 Peep data can adjust attention messaging, but it must not be treated as a medical diagnosis.
 
@@ -1666,7 +2142,7 @@ sudden silence after recent high activity => mention uncertainty; check directly
 The chatbot may cite peep trends as evidence only when the answer also reminds the user to directly
 check the brooder.
 
-## 13.11 Annotation and training loop
+## 14.11 Annotation and training loop
 
 Training should be continuous, explicit, and auditable.
 
@@ -1708,13 +2184,13 @@ promoted without review.
 
 ---
 
-# 14. Chat agent specification
+# 15. Chat agent specification
 
-## 14.1 Agent name
+## 15.1 Agent name
 
 **Ask BroodCast**
 
-## 14.2 Model
+## 15.2 Model
 
 Use **Kimi K2.5/Kimi K2.6** through Fireworks.
 
@@ -1736,7 +2212,7 @@ Current runtime note:
 * If the Fireworks call fails, the app uses a conservative local fallback answer with the same
   response shape.
 
-## 14.3 BAML files
+## 15.3 BAML files
 
 ```text
 baml_src/
@@ -1744,7 +2220,7 @@ baml_src/
   broodcast.baml
 ```
 
-## 14.4 `clients.baml`
+## 15.4 `clients.baml`
 
 ```baml
 client<llm> Kimi {
@@ -1757,7 +2233,7 @@ client<llm> Kimi {
 }
 ```
 
-## 14.5 `broodcast.baml`
+## 15.5 `broodcast.baml`
 
 ```baml
 class ChickObservation {
@@ -1803,6 +2279,29 @@ function AnswerChickQuestion(
     - Never tell users to change heat, food, water, or housing without checking conditions directly.
     - Treat peep activity as an approximate local audio signal. Never imply that raw audio or human voices are available.
     - If the question involves danger, distress, injury, lethargy, overheating, dehydration, constant loud peeping, or a chick being trapped, set safety_level to adult_attention.
+    - You must follow the classroom chick care agreement.
+    - Keep chicks warm.
+    - Keep fresh clean water available.
+    - Feed chick mash.
+    - Do not give other food, except the handwritten note appears to allow corn cobs and watermelon rinds.
+    - Keep chicks in a secure bin or enclosure.
+    - Keep them in a warm, draft-free area.
+    - Keep them away from pets at all times.
+    - Handling requires adult supervision.
+    - Children should sit criss-cross with feet tucked while holding chicks.
+    - No walking around while holding chicks.
+    - Younger siblings require 100% adult supervision.
+    - Outdoor time must be closely supervised.
+    - Never leave chicks unattended outside.
+    - Do not let chicks roam freely indoors.
+    - At bedtime, cover the bin with the provided blanket.
+    - Replace doggy pad papers if needed.
+    - Clean fake grass with water and cloth only; no chemicals.
+    - Let fake grass dry before returning it.
+    - Before transport back to school, remove heat source, water container, and food container and place them in the provided bag.
+    - Most important rule: never leave the chicks unattended.
+    - If the user asks whether an action is allowed, answer according to these rules.
+    - If unsure, advise asking the teacher or an adult caregiver.
 
     Latest observation:
     {{ latest_observation }}
@@ -1822,7 +2321,7 @@ function AnswerChickQuestion(
 }
 ```
 
-## 14.6 Chat response UI
+## 15.6 Chat response UI
 
 Render as:
 
@@ -1841,7 +2340,7 @@ Safety level
 Normal / Check now / Adult attention
 ```
 
-## 14.7 Knowledge snippets
+## 15.7 Knowledge snippets
 
 Create static snippets in:
 
@@ -1851,6 +2350,15 @@ app/data/chick-care-kb.ts
 
 Include short, conservative, sourced-in-spirit care facts such as:
 
+* Camera monitoring does not count as adult supervision.
+* The care agreement requires fresh clean water, chick mash, warmth, a secure enclosure, and direct
+  adult checks.
+* The printed food rule is chick mash only; a handwritten exception appears to allow corn cobs and
+  watermelon rinds.
+* Handling requires adult supervision, seated children, and no walking around with chicks.
+* Outdoor time requires close supervision and must never become unattended outdoor time.
+* Cleaning fake grass should use water and a cloth only, no chemicals, and the grass should dry
+  before returning.
 * Chicks need access to a warm area and a cooler area.
 * Huddling near heat can indicate cold or resting.
 * Avoiding heat can indicate overheating.
@@ -1862,15 +2370,15 @@ Keep snippets short. Do not make the model rely on internet access during the we
 
 ---
 
-# 15. Auth specification
+# 16. Auth specification
 
-## 15.1 Requirement
+## 16.1 Requirement
 
 Production target: use magic-link login for admin functionality.
 
 Current weekend implementation: use a temporary password/token gate.
 
-## 15.2 Recommended implementation
+## 16.2 Recommended implementation
 
 Original recommendation: use Supabase Auth magic links.
 
@@ -1878,21 +2386,21 @@ Current selected implementation: use `ADMIN_TOKEN` for a simple admin session co
 
 Admin-only routes:
 
-* `/dashboard`
-* `/api/manual-notes`
-* `/api/zones`
+* `/broodcast/dashboard`
+* `/broodcast/api/manual-notes`
+* `/broodcast/api/zones`
 * report generation controls
 * stream visibility controls
 
 Public routes:
 
 * `/`
-* `/live`
-* `/report` if explicitly shared
+* `/broodcast/live`
+* `/broodcast/report` if explicitly shared
 * `/api/latest`
 * `/api/chat`, rate-limited
 
-## 15.3 Authorization
+## 16.3 Authorization
 
 Only allow emails in an allowlist to become admin.
 
@@ -1904,9 +2412,9 @@ ADMIN_EMAILS=parent@example.com,teacher@example.com
 
 ---
 
-# 16. Frontend component specification
+# 17. Frontend component specification
 
-## 16.1 `LiveStream`
+## 17.1 `LiveStream`
 
 Props:
 
@@ -1924,7 +2432,7 @@ Behavior:
 * Shows stale warning if last update is older than threshold.
 * Refreshes every 2–5 seconds or subscribes via SSE.
 
-## 16.2 `ChickStatsCards`
+## 17.2 `ChickStatsCards`
 
 Props:
 
@@ -1939,7 +2447,7 @@ type ChickStatsCardsProps = {
 };
 ```
 
-## 16.3 `AskBroodCast`
+## 17.3 `AskBroodCast`
 
 Props:
 
@@ -1955,7 +2463,7 @@ Behavior:
 * Calls `/api/chat`.
 * Renders structured answer.
 
-## 16.4 `ObservationTimeline`
+## 17.4 `ObservationTimeline`
 
 Shows recent observations in reverse chronological order.
 
@@ -1968,7 +2476,7 @@ Columns:
 * Summary.
 * Alerts.
 
-## 16.5 `PeepActivityChart`
+## 17.5 `PeepActivityChart`
 
 Shows recent peep events as a trend chart.
 
@@ -1993,7 +2501,7 @@ Behavior:
 * Shows a privacy label such as "Local frequency detection only. No raw audio uploaded."
 * Does not include audio playback controls.
 
-## 16.6 `ManualNoteForm`
+## 17.6 `ManualNoteForm`
 
 Admin-only.
 
@@ -2003,13 +2511,34 @@ Fields:
 * Visibility: private/public.
 * Submit.
 
-## 16.7 `SafetyBanner`
+## 17.7 `CareChecklist`
+
+Admin-first, optionally public summary.
+
+Props:
+
+```ts
+type CareChecklistProps = {
+  compliance: CareComplianceState;
+  mode: "admin" | "public_summary";
+};
+```
+
+Behavior:
+
+* Shows Daily Care, Handling, Outdoor Time, Nighttime, Cleaning, and Return to School groups.
+* Lets admins record manual checks and events.
+* Shows reminders for stale food, water, heat, pet-safety, bedding, and adult-check confirmations.
+* Shows "camera monitoring does not count as adult supervision" near adult-check status.
+* Public summary should show status and reminders, not private notes.
+
+## 17.8 `SafetyBanner`
 
 Required on public and admin pages.
 
 ---
 
-# 17. Repo structure
+# 18. Repo structure
 
 ```text
 broodcast/
@@ -2082,7 +2611,7 @@ broodcast/
 
 ---
 
-# 18. Environment variables
+# 19. Environment variables
 
 ## Web app
 
@@ -2126,7 +2655,7 @@ PEEP_FILTER_HIGH_HZ=6500
 
 ---
 
-# 19. Weekend implementation plan
+# 20. Weekend implementation plan
 
 ## Friday night: skeleton and local proof
 
@@ -2136,7 +2665,7 @@ PEEP_FILTER_HIGH_HZ=6500
 * Add Fly deployment config.
 * Add Supabase/Postgres connection.
 * Create DB schema.
-* Add `/live` page.
+* Add `/broodcast/live` page.
 * Add `/api/ingest/observation`.
 * Add `/api/latest`.
 
@@ -2146,11 +2675,11 @@ PEEP_FILTER_HIGH_HZ=6500
 * Prove microphone access locally without uploading audio.
 * Save latest frame locally.
 * Send fake observation to web app.
-* Verify `/live` updates.
+* Verify `/broodcast/live` updates.
 
 Acceptance criteria:
 
-* `/live` renders latest fake frame and stats.
+* `/broodcast/live` renders latest fake frame and stats.
 * Local worker can push observation JSON.
 
 ---
@@ -2180,7 +2709,7 @@ Acceptance criteria:
 * Implement band-pass peep candidate detection.
 * Emit only event metadata and aggregate stats.
 * Add peep stats to observation ingest.
-* Add peep activity display to `/live` and `/dashboard`.
+* Add peep activity display to `/broodcast/live` and `/broodcast/dashboard`.
 
 Acceptance criteria:
 
@@ -2212,8 +2741,10 @@ Acceptance criteria:
 
 * Add magic-link login.
 * Add admin allowlist.
-* Add `/dashboard`.
+* Add `/broodcast/dashboard`.
 * Add manual notes.
+* Add Care Checklist panel for heat, water, food, enclosure, pets, bedding, adult checks, handling,
+  outdoor time, nighttime routine, cleaning, and return-to-school readiness.
 * Show recent observations.
 * Add stream health display.
 
@@ -2221,13 +2752,14 @@ Acceptance criteria:
 
 * Admin can log in.
 * Admin can add a manual note.
+* Admin can record classroom care agreement checks.
 * Chat answers include manual notes.
 
 ---
 
 ## Sunday morning: report
 
-* Add `/report`.
+* Add `/broodcast/report`.
 * Summarize observations.
 * Include manual notes.
 * Include comfort score timeline.
@@ -2259,26 +2791,29 @@ Acceptance criteria:
 
 ---
 
-# 20. Acceptance criteria
+# 21. Acceptance criteria
 
 ## Functional acceptance
 
 The MVP is complete when:
 
-1. A public user can visit `/live`.
+1. A public user can visit `/broodcast/live`.
 2. The page shows a recent annotated image of the brooder.
 3. The page shows chick count, zone labels, and comfort score.
-4. The page shows peep activity over time using derived event metrics only.
-5. A user can ask the chatbot a question.
-6. The chatbot answers using latest observation data.
-7. Admin can log in via magic link.
-8. Admin can add manual notes.
-9. A report page summarizes the weekend.
-10. Local worker can be stopped/restarted without breaking the app.
-11. The app displays a stale-data warning when updates stop.
-12. Observations include location, camera, calibration, and model-version metadata, even if the
+4. The dashboard shows whether the household is following the classroom care agreement.
+5. Admin can record heat, water, food, enclosure, pet-safety, bedding, adult-check, handling,
+   outdoor-time, nighttime, cleaning, and transport checklist state.
+6. The page shows peep activity over time using derived event metrics only.
+7. A user can ask the chatbot a question.
+8. The chatbot answers using latest observation data and classroom care agreement rules.
+9. Admin can log in via magic link.
+10. Admin can add manual notes.
+11. A report page summarizes the weekend.
+12. Local worker can be stopped/restarted without breaking the app.
+13. The app displays a stale-data warning when updates stop.
+14. Observations include location, camera, calibration, and model-version metadata, even if the
     weekend build uses default single-location values.
-13. The annotation UI can distinguish human labels from local model labels.
+15. The annotation UI can distinguish human labels from local model labels.
 
 ## Safety acceptance
 
@@ -2289,12 +2824,14 @@ The MVP is acceptable only if:
 3. The chatbot does not diagnose health issues.
 4. The chatbot recommends direct adult checks for concerning scenarios.
 5. Public pages include an explicit supervision disclaimer.
-6. The system labels scores as “comfort signals,” not health status.
-7. Raw audio is not streamed, stored, played back, or exposed through APIs.
-8. Peep tracking uploads only frequency-derived events and aggregate stats.
-9. Raw video or high-resolution source frames are not uploaded for training without explicit admin
+6. The app states that camera monitoring does not count as adult supervision.
+7. The chatbot follows the classroom care agreement when users ask whether an action is allowed.
+8. The system labels scores as “comfort signals,” not health status.
+9. Raw audio is not streamed, stored, played back, or exposed through APIs.
+10. Peep tracking uploads only frequency-derived events and aggregate stats.
+11. Raw video or high-resolution source frames are not uploaded for training without explicit admin
    selection.
-10. Camera-displacement or poor-view periods are marked degraded before they feed stable statistics.
+12. Camera-displacement or poor-view periods are marked degraded before they feed stable statistics.
 
 ## Training acceptance
 
@@ -2312,9 +2849,9 @@ The long-term training loop is acceptable when:
 
 ---
 
-# 21. Engineering notes
+# 22. Engineering notes
 
-## 21.1 Separate video streaming from annotation
+## 22.1 Separate video streaming from annotation
 
 Video has a direct stream/upload path to the webserver for live viewing and bucket-backed storage.
 It also has a parallel annotation path that can run every 2-5 seconds or at another practical
@@ -2328,7 +2865,7 @@ Audio is different: do not stream raw microphone audio. Process it locally throu
 and human-voice suppression, then upload only derived peep events, aggregate trends, and coarse
 spectral data from which spoken language is not extractable.
 
-## 21.2 Do not overbuild identity
+## 22.2 Do not overbuild identity
 
 With two similar chicks, persistent identity may be unreliable.
 
@@ -2337,23 +2874,23 @@ Use temporary track IDs based on nearest centroid.
 Long term, named chickens should be supported, but identity must remain probabilistic. Prefer
 `unknown_chick` or low-confidence identity over pretending the model knows which bird is which.
 
-## 21.3 Do not block the UI on model calls
+## 22.3 Do not block the UI on model calls
 
 The live view should update independently of chat.
 
-## 21.4 Do not centralize raw media by default
+## 22.4 Do not centralize raw media by default
 
 Local media is a training asset, but it is also sensitive household data. Build the training loop so
 local machines can keep raw clips and frames private while exporting annotations, manifests,
 derived metrics, and selected opt-in examples.
 
-## 21.5 Do not let model upgrades rewrite history
+## 22.5 Do not let model upgrades rewrite history
 
 Statistics should be reproducible. Store model version, calibration version, location, camera
 attachment, and view-health state with observations. If historical data is reprocessed, write a new
 derived-statistics version instead of silently replacing old values.
 
-## 21.6 Do not put Codex in the runtime care loop
+## 22.6 Do not put Codex in the runtime care loop
 
 Codex can inspect logs and propose improvements, but it should not make care decisions.
 
@@ -2369,7 +2906,7 @@ Every 15 minutes:
 
 ---
 
-# 22. Initial design direction
+# 23. Initial design direction
 
 Visual style:
 
@@ -2419,7 +2956,7 @@ Can you explain this for kids?
 
 ---
 
-# 23. Risks and mitigations
+# 24. Risks and mitigations
 
 | Risk                            | Likelihood | Impact | Mitigation                                             |
 | ------------------------------- | ---------: | -----: | ------------------------------------------------------ |
@@ -2441,7 +2978,7 @@ Can you explain this for kids?
 
 ---
 
-# 24. Fallback plan
+# 25. Fallback plan
 
 If Falcon-Perception is too hard to run this weekend, ship the app with:
 
@@ -2482,7 +3019,7 @@ Observe → annotate → explain → coach → report
 
 ---
 
-# 25. Definition of done
+# 26. Definition of done
 
 The project is done for the weekend when:
 
@@ -2499,7 +3036,7 @@ The project is done for the weekend when:
 
 ---
 
-# 26. Next work: Python webcam and model worker
+# 27. Next work: Python webcam and model worker
 
 The next development priority is the Python side of the system.
 
