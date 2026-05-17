@@ -7,6 +7,11 @@ const origin = `http://127.0.0.1:${port}`
 const dist = new URL('../dist/', import.meta.url)
 const publicDir = new URL('../public/', import.meta.url)
 const cname = new URL('../CNAME', import.meta.url)
+const staticPages = [
+  { path: '/', file: 'index.html' },
+  { path: '/broodcast', file: 'broodcast/index.html' },
+  { path: '/broodcast/live', file: 'broodcast/live/index.html' },
+]
 
 await rm(dist, { recursive: true, force: true })
 await mkdir(dist, { recursive: true })
@@ -45,8 +50,15 @@ try {
     throw new Error(`Timed out waiting for ${origin}`)
   }
 
-  const html = await response.text()
-  await writeFile(new URL('index.html', dist), html)
+  for (const page of staticPages) {
+    let pageResponse = page.path === '/' ? response : await fetch(`${origin}${page.path}`)
+    if (!pageResponse.ok) {
+      throw new Error(`Failed to render ${page.path}: ${pageResponse.status}`)
+    }
+
+    await mkdir(new URL('.', new URL(page.file, dist)), { recursive: true })
+    await writeFile(new URL(page.file, dist), await pageResponse.text())
+  }
   await writeFile(new URL('CNAME', dist), await readFile(cname))
 } finally {
   server.kill('SIGTERM')
