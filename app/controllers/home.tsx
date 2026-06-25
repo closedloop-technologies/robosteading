@@ -15,14 +15,14 @@ function HomePage() {
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>RoboSteading - AI Automation for the Homestead</title>
+        <title>RoboSteading - AI Garden Automation</title>
         <meta
           name="description"
-          content="AI automation for the homestead, ranging from everything from timers, smart automation, home lab stuff to robots."
+          content="AI garden automation with camera monitoring, watering control, agentic research, and sim-to-real 3D plant state modeling."
         />
         <meta
           name="keywords"
-          content="robosteading, AI automation, farming, homelab, smart automation, robotics, homestead"
+          content="robosteading, AI garden automation, smart irrigation, computer vision, digital twin, sim2real, homestead"
         />
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/favicons/apple-touch-icon.png" />
@@ -84,10 +84,11 @@ function HomePage() {
               <span></span>
             </button>
             <nav className="nav-links" id="nav-links">
-              <a href="#value">Philosophy</a>
-              <a href="#use-cases">Components</a>
+              <a href="#value">Garden OS</a>
+              <a href="#use-cases">Control Loop</a>
+              <a href="#digital-twin">3D Parity</a>
               <a href="#inquire" className="nav-cta">
-                Join the Movement →
+                Build with us →
               </a>
             </nav>
           </div>
@@ -96,25 +97,26 @@ function HomePage() {
         <section className="hero" id="hero">
           <div className="hero-bg" aria-hidden="true"></div>
           <div className="hero-content">
-            <span className="hero-badge">✦ The Future of Agriculture</span>
+            <span className="hero-badge">✦ Garden Intelligence Layer</span>
             <h1>
-              <span className="highlight">AI Automation</span>
+              <span className="highlight">Computer Vision</span>
               <br />
-              For the Modern Homestead
+              For the Living Garden
             </h1>
             <p className="hero-subtitle">
-              Bring the cutting-edge of technology back to the earth. From simple IoT timers and
-              smart automation to advanced robotics and your own home lab.
+              RoboSteading watches plant growth, controls watering, and gives an AI agent the
+              sensor history, research context, and domain knowledge needed to reason about the
+              garden.
             </p>
             <div className="hero-actions">
               <a href="/broodcast" className="btn btn-primary">
                 Open BroodCast →
               </a>
               <a href="#inquire" className="btn btn-primary" id="hero-cta">
-                Explore Setup →
+                Discuss a Garden Setup →
               </a>
               <a href="#value" className="btn btn-secondary">
-                Learn more
+                See the loop
               </a>
             </div>
           </div>
@@ -123,30 +125,30 @@ function HomePage() {
         <section className="section" id="value">
           <div className="container">
             <div className="reveal">
-              <span className="section-label">Core Philosophy</span>
-              <h2 className="section-title">Grow Smarter, Not&nbsp;Harder</h2>
+              <span className="section-label">Garden OS</span>
+              <h2 className="section-title">Observe, Decide, Act, Learn</h2>
               <p className="section-subtitle">
-                Embracing the earth does not mean abandoning technology. We leverage powerful
-                open-source models, affordable sensors, and local-first architectures to
-                revolutionize small scale farming and living.
+                A small garden becomes easier to manage when cameras, irrigation, telemetry, and
+                plant knowledge share one operating context. The system closes the loop from visual
+                evidence to physical action.
               </p>
             </div>
             <div className="value-grid reveal-stagger">
-              <ValueCard icon="⏱️" title="Smart Timers">
-                Automate irrigation, lighting, and feeding with precision schedules that adapt to
-                local weather data.
+              <ValueCard icon="📷" title="Camera Monitoring">
+                Track growth stage, canopy coverage, fruit readiness, pest pressure, wilting, and
+                setup issues from recurring garden images.
               </ValueCard>
-              <ValueCard icon="🧠" title="Homelab Brain">
-                Run local LLMs and home assistants that maintain ultimate privacy while
-                orchestrating the farm.
+              <ValueCard icon="💧" title="Watering Control">
+                Drive irrigation zones from schedules, soil conditions, weather, and model
+                confidence instead of fixed timers alone.
               </ValueCard>
-              <ValueCard icon="🤖" title="Ag-Robotics">
-                Tending crops, autonomously maneuvering terrain, and deploying computer vision for
-                pest control.
+              <ValueCard icon="🧠" title="AI Garden Agent">
+                Ask what changed, what to pick, what failed, or what to try next. The agent can
+                query local data and bring in outside research.
               </ValueCard>
-              <ValueCard icon="📊" title="Data Driven">
-                Everything from soil moisture and pH to greenhouse temperatures logged into a
-                real-time dashboard.
+              <ValueCard icon="🌱" title="Growth State Memory">
+                Keep a history of plant observations, annotations, interventions, and outcomes so
+                the garden gets easier to reason about over time.
               </ValueCard>
             </div>
           </div>
@@ -155,37 +157,75 @@ function HomePage() {
         <section className="section" id="use-cases">
           <div className="container">
             <div className="reveal">
-              <span className="section-label">Ecosystem</span>
-              <h2 className="section-title">The Complete&nbsp;Stack</h2>
+              <span className="section-label">Control Loop</span>
+              <h2 className="section-title">From Camera Frame to Garden Action</h2>
               <p className="section-subtitle">
-                The homestead of the future is built iteratively. Here is what you need to get
-                started.
+                The garden stack is built for local hardware first, with narrow APIs for trusted
+                ingestion, dashboards, and agent queries.
               </p>
             </div>
             <div className="use-cases-list reveal-stagger">
-              <UseCase title="Sensors & Telemetry">
-                Soil probes, environmental monitors, esp32 microcontrollers, and weather stations.
+              <UseCase title="Visual Capture">
+                Garden cameras produce a repeatable view of beds, trellises, containers, and
+                trouble spots.
               </UseCase>
-              <UseCase title="Local Cloud">
-                A ruggedized server rack running Proxmox, HomeAssistant, and local vector
-                databases.
+              <UseCase title="State Classification">
+                Vision models label plant health, growth phase, harvest signals, and debugging
+                cues like blocked emitters or fallen supports.
               </UseCase>
-              <UseCase title="AI Orchestrator">
-                An agent that analyzes telemetry trends to predict water needs and yield outcomes.
+              <UseCase title="Irrigation Decisions">
+                Watering can be triggered, held, or adjusted by zone using observations,
+                forecasts, and recent intervention history.
               </UseCase>
-              <UseCase title="Actuators">
-                Automated solenoid valves, robotic arms, and mechanized rovers for physical
-                interaction.
+              <UseCase title="Queryable Knowledge">
+                The agent answers from garden data, plant-care knowledge, and research instead of
+                relying on generic chat context.
               </UseCase>
+            </div>
+          </div>
+        </section>
+
+        <section className="section digital-twin-section" id="digital-twin">
+          <div className="container twin-layout">
+            <div className="reveal">
+              <span className="section-label">Sim2Real Parity</span>
+              <h2 className="section-title">A 3D Garden Model That Learns the Real Garden</h2>
+              <p className="section-subtitle">
+                Camera observations should align with a living 3D model of beds, plants, supports,
+                and irrigation zones. That parity makes plant state classification easier to
+                inspect, debug, and improve.
+              </p>
+              <div className="twin-points">
+                <span>Plant geometry and canopy growth</span>
+                <span>Harvest readiness and growth stage</span>
+                <span>Water zones, shadows, and constraints</span>
+              </div>
+            </div>
+            <div className="garden-model" aria-label="3D garden model preview">
+              <div className="model-bed">
+                <span className="model-plant plant-a"></span>
+                <span className="model-plant plant-b"></span>
+                <span className="model-plant plant-c"></span>
+                <span className="model-plant plant-d"></span>
+                <span className="model-line line-a"></span>
+                <span className="model-line line-b"></span>
+                <span className="model-camera"></span>
+                <span className="model-water"></span>
+              </div>
+              <div className="model-readout">
+                <span>State map</span>
+                <strong>Growth: vegetative</strong>
+                <strong>Watering: zone 2 pending</strong>
+              </div>
             </div>
           </div>
         </section>
 
         <section className="cta-band" id="inquire">
           <div className="container reveal">
-            <h2>Join the RoboSteading&nbsp;Network</h2>
+            <h2>Build the Garden Control Layer</h2>
             <p>
-              Ready to automate your homestead and embrace the decentralized agriculture movement?
+              Bring cameras, irrigation, plant state, and AI research into one garden-aware system.
             </p>
             <a
               href="mailto:sean@closedloop.tech?subject=Inquiry%20About%20Robosteading"

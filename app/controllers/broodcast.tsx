@@ -11,24 +11,54 @@ import {
   addManualNote,
   addObservation,
   allObservations,
+  getCompliance,
   getZones,
   isPublicVisible,
   latestObservation,
   listAnnotations,
   listChickIdentities,
+  listInteractionLogs,
   listManualNotes,
   listObservations,
+  logInteraction,
+  peepActivity,
   replaceZones,
   setPublicVisible,
+  updateCompliance,
   upsertChickIdentity,
+  type CareComplianceState,
   type ChickIdentity,
   type BrooderAnnotation,
   type Detection,
+  type InteractionLog,
   type Observation,
 } from '../data/store.ts'
 import { PageShell, SafetyBanner, StatusLine } from '../ui/layout.tsx'
 import { json, readJson, redirect } from '../utils/http.ts'
 import { render } from '../utils/render.tsx'
+
+type PeepActivity = Awaited<ReturnType<typeof peepActivity>>
+
+type LivePageProps = {
+  latest: Observation | null
+  recent: Observation[]
+  visible: boolean
+  annotations: BrooderAnnotation[]
+  chickIdentities: ChickIdentity[]
+  compliance: CareComplianceState
+  peeps: PeepActivity
+}
+
+type DashboardPageProps = {
+  latest: Observation | null
+  recent: Observation[]
+  notes: Awaited<ReturnType<typeof listManualNotes>>
+  zones: Awaited<ReturnType<typeof getZones>>
+  visible: boolean
+  interactionLogs: InteractionLog[]
+  compliance: CareComplianceState
+  peeps: PeepActivity
+}
 
 export const live = {
   async handler({ request }: { request: Request }) {
@@ -37,6 +67,8 @@ export const live = {
     let visible = await isPublicVisible()
     let annotations = await listAnnotations()
     let chickIdentities = await listChickIdentities()
+    let compliance = await getCompliance()
+    let peeps = await peepActivity(60)
     return render(
       <PageShell title="BroodCast" description="A window into the secret life of chicks.">
         <LivePage
@@ -45,6 +77,8 @@ export const live = {
           visible={visible}
           annotations={annotations}
           chickIdentities={chickIdentities}
+          compliance={compliance}
+          peeps={peeps}
         />
       </PageShell>,
       request,
@@ -60,6 +94,9 @@ export const dashboard = {
     let notes = await listManualNotes({ includePrivate: true })
     let zones = await getZones()
     let visible = await isPublicVisible()
+    let interactionLogs = await listInteractionLogs(40)
+    let compliance = await getCompliance()
+    let peeps = await peepActivity(120)
     return render(
       <PageShell title="BroodCast Dashboard" description="Admin dashboard for BroodCast.">
         <DashboardPage
@@ -68,6 +105,9 @@ export const dashboard = {
           notes={notes}
           zones={zones}
           visible={visible}
+          interactionLogs={interactionLogs}
+          compliance={compliance}
+          peeps={peeps}
         />
       </PageShell>,
       request,
@@ -143,6 +183,47 @@ export const apiObservations = {
   },
 }
 
+export const apiPeeps = {
+  async handler({ url }: { url: URL }) {
+    let minutes = Number(url.searchParams.get('minutes') ?? '60')
+    return json(await peepActivity(Number.isFinite(minutes) ? minutes : 60))
+  },
+}
+
+export const apiCompliance = {
+  async handler({ request }: { request: Request }) {
+    if (request.method === 'GET') return json({ compliance: await getCompliance() })
+    if (!isAdminRequest(request)) return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+
+    let contentType = request.headers.get('content-type') ?? ''
+    let action = ''
+    let value: string | undefined
+    if (contentType.includes('application/json')) {
+      let body = await readJson(request)
+      if (body && typeof body === 'object') {
+        action = String((body as Record<string, unknown>).action ?? '')
+        value = typeof (body as Record<string, unknown>).value === 'string'
+          ? String((body as Record<string, unknown>).value)
+          : undefined
+      }
+    } else {
+      let form = await request.formData()
+      action = String(form.get('action') ?? '')
+      value = typeof form.get('value') === 'string' ? String(form.get('value')) : undefined
+    }
+
+    try {
+      let compliance = await updateCompliance(action, value)
+      return contentType.includes('application/json')
+        ? json({ ok: true, compliance })
+        : redirect('/broodcast/dashboard')
+    } catch (error) {
+      let message = error instanceof Error ? error.message : 'Unable to update checklist.'
+      return json({ ok: false, error: message }, { status: 400 })
+    }
+  },
+}
+
 export const apiLatestAudioSpectrum = {
   async handler({ url }: { url: URL }) {
     let after = Number(url.searchParams.get('after') ?? '0')
@@ -199,6 +280,7 @@ export const apiIngestObservation = {
 
 export const apiChat = {
   async handler({ request }: { request: Request }) {
+    let startedAt = Date.now()
     let body = await readJson(request)
     let message =
       body && typeof body === 'object' && typeof (body as Record<string, unknown>).message === 'string'
@@ -206,12 +288,27 @@ export const apiChat = {
         : ''
     if (!message.trim()) return json({ error: 'Message is required.' }, { status: 400 })
 
+    let latest = await latestObservation()
     let answer = await answerChickQuestion(
       message,
-      await latestObservation(),
+      latest,
       await listObservations(60),
       await listManualNotes({ includePrivate: isAdminRequest(request) }),
     )
+    await logInteraction({
+      kind: 'chat',
+      observation_id: latest?.id ?? null,
+      frame_id: latest?.frame_id ?? null,
+      actor: isAdminRequest(request) ? 'admin' : 'public',
+      summary: message.slice(0, 180),
+      metadata: {
+        confidence: answer.confidence,
+        safety_level: answer.safety_level,
+        latency_ms: Date.now() - startedAt,
+        suggested_check_count: answer.suggested_checks.length,
+        evidence_count: answer.evidence.length,
+      },
+    })
     return json(answer)
   },
 }
@@ -262,6 +359,21 @@ export const apiAnnotations = {
       image_size: imageSize,
       created_by: typeof input.created_by === 'string' ? input.created_by : 'kid',
     })
+    await logInteraction({
+      kind: 'annotation_saved',
+      observation_id: annotation.observation_id,
+      frame_id: annotation.frame_id,
+      actor: isAdminRequest(request) ? 'admin' : 'public',
+      summary: `${annotation.label} ${annotation.kind}`,
+      metadata: {
+        label: annotation.label,
+        kind: annotation.kind,
+        source: annotation.source,
+        has_corners: Array.isArray(annotation.corners),
+        has_box: Array.isArray(annotation.box),
+        has_point: Array.isArray(annotation.point),
+      },
+    })
     return json({ ok: true, annotation })
   },
 }
@@ -297,6 +409,20 @@ export const apiAnnotationAssist = {
       chickIdentities: await listChickIdentities(),
       draft,
     })
+    await logInteraction({
+      kind: 'annotation_assist',
+      observation_id: observation?.id ?? null,
+      frame_id: observation?.frame_id ?? null,
+      actor: isAdminRequest(request) ? 'admin' : 'public',
+      summary: `Annotation assist via ${result.provider}`,
+      metadata: {
+        provider: result.provider,
+        suggestion_count: result.suggestions.length,
+        detection_count: detections.length,
+        draft_kind: draft?.kind ?? null,
+        draft_label: draft?.label ?? null,
+      },
+    })
 
     return json({ ok: true, ...result })
   },
@@ -320,6 +446,14 @@ export const apiChickNames = {
       name,
       observation_id: typeof input.observation_id === 'string' ? input.observation_id : null,
       example_bbox: exampleBbox,
+    })
+    await logInteraction({
+      kind: 'chick_named',
+      observation_id: identity.observation_id,
+      frame_id: null,
+      actor: isAdminRequest(request) ? 'admin' : 'public',
+      summary: `${identity.track_id} named ${identity.name}`,
+      metadata: { track_id: identity.track_id, name: identity.name },
     })
     return json({ ok: true, identity })
   },
@@ -346,6 +480,12 @@ export const apiManualNotes = {
 
     if (!note.trim()) return json({ ok: false, error: 'Note is required.' }, { status: 400 })
     let saved = await addManualNote(note.trim(), visibility)
+    await logInteraction({
+      kind: 'manual_note',
+      actor: 'admin',
+      summary: saved.note.slice(0, 180),
+      metadata: { visibility: saved.visibility },
+    })
     return contentType.includes('application/json')
       ? json({ ok: true, note: saved })
       : redirect('/broodcast/dashboard')
@@ -386,13 +526,9 @@ function LivePage() {
     visible,
     annotations,
     chickIdentities,
-  }: {
-    latest: Observation | null
-    recent: Observation[]
-    visible: boolean
-    annotations: BrooderAnnotation[]
-    chickIdentities: ChickIdentity[]
-  }) => (
+    compliance,
+    peeps,
+  }: LivePageProps) => (
     <section className="cc-section live-page">
       <SafetyBanner />
       <div className="hero-row">
@@ -445,6 +581,8 @@ function LivePage() {
           <h2>Current Status</h2>
           <div id="stats-cards" className="stats-grid">
             <StatsCards observation={latest} />
+            <CareStatusCards compliance={compliance} />
+            <PeepMetric peeps={peeps} />
           </div>
           <h3>Ask BroodCast</h3>
           <ChatBox />
@@ -569,7 +707,7 @@ function LivePage() {
 }
 
 function DashboardPage() {
-  return ({ latest, recent, notes, zones, visible }: any) => (
+  return ({ latest, recent, notes, zones, visible, interactionLogs, compliance, peeps }: DashboardPageProps) => (
     <section className="cc-section">
       <SafetyBanner />
       <div className="hero-row">
@@ -589,6 +727,13 @@ function DashboardPage() {
           <h2>Latest Observation</h2>
           <StatusLine observation={latest} />
           <p className="muted">{latest?.summary ?? 'No observation yet.'}</p>
+        </section>
+        <section className="panel">
+          <h2>Care Checklist</h2>
+          <div className="stats-grid">
+            <CareStatusCards compliance={compliance} />
+            <PeepMetric peeps={peeps} />
+          </div>
         </section>
         <section className="panel">
           <h2>Stream Visibility</h2>
@@ -643,6 +788,39 @@ function DashboardPage() {
       <section className="panel">
         <h2>Recent Observations</h2>
         <ObservationTable observations={recent} />
+      </section>
+      <section className="panel">
+        <h2>Interaction Logs</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Kind</th>
+                <th>Actor</th>
+                <th>Summary</th>
+                <th>Frame</th>
+              </tr>
+            </thead>
+            <tbody>
+              {interactionLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>No interactions logged yet.</td>
+                </tr>
+              ) : (
+                interactionLogs.map((log: any) => (
+                  <tr key={log.id}>
+                    <td>{new Date(log.created_at).toLocaleTimeString()}</td>
+                    <td>{log.kind}</td>
+                    <td>{log.actor}</td>
+                    <td>{log.summary}</td>
+                    <td>{log.frame_id ?? 'none'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   )
@@ -706,6 +884,34 @@ function StatsCards() {
       <Metric label="Movement" value={formatNumber(observation?.stats.movement_score)} />
     </>
   )
+}
+
+function CareStatusCards() {
+  return ({ compliance }: { compliance: CareComplianceState }) => {
+    let needsCheck = [
+      compliance.heatSource.status,
+      compliance.food.status,
+      compliance.water.status,
+      compliance.petSafety.status,
+      compliance.supervision.status,
+      compliance.enclosure.status,
+    ].filter((status) => String(status).includes('needs')).length
+
+    return (
+      <>
+        <Metric label="Care checks due" value={String(needsCheck)} />
+        <Metric label="Adult check" value={compliance.supervision.status.replaceAll('_', ' ')} />
+      </>
+    )
+  }
+}
+
+function PeepMetric() {
+  return ({ peeps }: { peeps: PeepActivity }) => {
+    let totalPeeps = peeps.buckets.reduce((sum, bucket) => sum + bucket.peep_count, 0)
+    let latestIntensity = peeps.buckets.at(-1)?.peep_intensity ?? 'none'
+    return <Metric label={`Peeps / ${peeps.minutes}m`} value={`${totalPeeps} ${latestIntensity}`} />
+  }
 }
 
 function Metric() {

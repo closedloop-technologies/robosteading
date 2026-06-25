@@ -9,9 +9,11 @@ import {
   apiIngestObservation,
   apiIngestAudioSpectrum,
   apiLatestAudioSpectrum,
+  apiCompliance,
   apiLatest,
   apiManualNotes,
   apiObservations,
+  apiPeeps,
   apiReport,
   apiZones,
   dashboard,
@@ -39,6 +41,9 @@ router.map(routes.broodcast.report, report)
 router.map(routes.broodcast.api.ingestObservation, apiIngestObservation)
 router.map(routes.broodcast.api.latest, apiLatest)
 router.map(routes.broodcast.api.observations, apiObservations)
+router.map(routes.broodcast.api.peeps, apiPeeps)
+router.map(routes.broodcast.api.compliance.latest, apiCompliance)
+router.map(routes.broodcast.api.compliance.action, apiCompliance)
 router.map(routes.broodcast.api.audio.latest, apiLatestAudioSpectrum)
 router.map(routes.broodcast.api.audio.ingest, apiIngestAudioSpectrum)
 router.map(routes.broodcast.api.chat, apiChat)
@@ -52,6 +57,9 @@ router.map(routes.broodcast.api.report, apiReport)
 router.map(routes.api.ingestObservation, apiIngestObservation)
 router.map(routes.api.latest, apiLatest)
 router.map(routes.api.observations, apiObservations)
+router.map(routes.api.peeps, apiPeeps)
+router.map(routes.api.compliance.latest, apiCompliance)
+router.map(routes.api.compliance.action, apiCompliance)
 router.map(routes.api.audio.latest, apiLatestAudioSpectrum)
 router.map(routes.api.audio.ingest, apiIngestAudioSpectrum)
 router.map(routes.api.chat, apiChat)

@@ -16,6 +16,11 @@ export const routes = route({
       ingestObservation: post('/api/ingest/observation'),
       latest: get('/api/latest'),
       observations: get('/api/observations'),
+      peeps: get('/api/peeps'),
+      compliance: {
+        latest: get('/api/compliance'),
+        action: post('/api/compliance'),
+      },
       audio: {
         latest: get('/api/audio/latest'),
         ingest: post('/api/audio/spectrum'),
@@ -36,6 +41,11 @@ export const routes = route({
     ingestObservation: post('/api/ingest/observation'),
     latest: get('/api/latest'),
     observations: get('/api/observations'),
+    peeps: get('/api/peeps'),
+    compliance: {
+      latest: get('/api/compliance'),
+      action: post('/api/compliance'),
+    },
     audio: {
       latest: get('/api/audio/latest'),
       ingest: post('/api/audio/spectrum'),

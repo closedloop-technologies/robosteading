@@ -487,6 +487,215 @@ ul {
 }
 
 /* ==============================
+   DIGITAL TWIN
+   ============================== */
+.digital-twin-section {
+  background:
+    linear-gradient(180deg, rgba(14, 165, 233, 0.05), transparent 46%),
+    rgba(255, 255, 255, 0.01);
+  border-top: 1px solid rgba(16, 185, 129, 0.08);
+}
+
+.twin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+  gap: 3rem;
+  align-items: center;
+}
+
+.twin-points {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+  max-width: 520px;
+}
+
+.twin-points span {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.twin-points span::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--color-accent-light);
+  box-shadow: 0 0 18px rgba(52, 211, 153, 0.55);
+  flex: 0 0 auto;
+}
+
+.garden-model {
+  position: relative;
+  min-height: 390px;
+  perspective: 950px;
+}
+
+.model-bed {
+  position: absolute;
+  inset: 3rem 1rem 3.5rem;
+  transform: rotateX(62deg) rotateZ(-28deg);
+  transform-style: preserve-3d;
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgba(251, 191, 36, 0.13) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(251, 191, 36, 0.1) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(15, 61, 38, 0.95), rgba(5, 20, 15, 0.96));
+  background-size: 46px 46px, 46px 46px, auto;
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.42),
+    inset 0 0 45px rgba(16, 185, 129, 0.11);
+}
+
+.model-bed::before,
+.model-bed::after {
+  content: "";
+  position: absolute;
+  inset: 9%;
+  border: 1px dashed rgba(34, 211, 238, 0.26);
+  border-radius: 12px;
+  transform: translateZ(10px);
+}
+
+.model-bed::after {
+  inset: 23% 18%;
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.model-plant,
+.model-line,
+.model-camera,
+.model-water {
+  position: absolute;
+  display: block;
+  transform-style: preserve-3d;
+}
+
+.model-plant {
+  width: 54px;
+  height: 54px;
+  border-radius: 50% 50% 46% 46%;
+  background:
+    radial-gradient(circle at 34% 32%, rgba(220, 252, 231, 0.72), transparent 18%),
+    radial-gradient(circle at 62% 64%, rgba(52, 211, 153, 0.82), transparent 35%),
+    #15803d;
+  box-shadow:
+    0 0 0 8px rgba(16, 185, 129, 0.09),
+    0 16px 28px rgba(0, 0, 0, 0.32);
+  transform: translateZ(28px);
+}
+
+.plant-a {
+  left: 18%;
+  top: 22%;
+}
+
+.plant-b {
+  left: 52%;
+  top: 20%;
+  width: 68px;
+  height: 68px;
+}
+
+.plant-c {
+  left: 30%;
+  top: 58%;
+  width: 64px;
+  height: 64px;
+}
+
+.plant-d {
+  left: 68%;
+  top: 56%;
+  width: 48px;
+  height: 48px;
+}
+
+.model-line {
+  left: 12%;
+  right: 12%;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+  transform: translateZ(18px);
+}
+
+.line-a {
+  top: 41%;
+}
+
+.line-b {
+  top: 73%;
+}
+
+.model-camera {
+  right: 7%;
+  top: 8%;
+  width: 42px;
+  height: 34px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  box-shadow: 0 0 22px rgba(226, 232, 240, 0.24);
+  transform: translateZ(42px);
+}
+
+.model-camera::after {
+  content: "";
+  position: absolute;
+  inset: 8px 12px;
+  border-radius: 50%;
+  background: #0ea5e9;
+}
+
+.model-water {
+  left: 8%;
+  bottom: 10%;
+  width: 40px;
+  height: 72px;
+  border-radius: 20px 20px 8px 8px;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.9), rgba(14, 165, 233, 0.46));
+  transform: translateZ(34px);
+}
+
+.model-readout {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: min(280px, 74%);
+  padding: 1rem;
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: var(--radius-sm);
+  background: rgba(2, 10, 7, 0.82);
+  box-shadow: var(--shadow-card);
+}
+
+.model-readout span,
+.model-readout strong {
+  display: block;
+}
+
+.model-readout span {
+  color: var(--color-success);
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.model-readout strong {
+  color: var(--color-text-heading);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* ==============================
    SOCIAL PROOF
    ============================== */
 .proof-section {
@@ -914,6 +1123,16 @@ ul {
   }
   .use-cases-list {
     grid-template-columns: 1fr;
+  }
+  .twin-layout {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .garden-model {
+    min-height: 330px;
+  }
+  .model-bed {
+    inset: 2.25rem 0.25rem 4.25rem;
   }
   .trust-grid {
     grid-template-columns: 1fr 1fr;

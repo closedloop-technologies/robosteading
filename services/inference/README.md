@@ -14,14 +14,28 @@ It currently:
 - Can save raw/annotated debug frames and run a finite smoke test.
 - Keeps running when detection or push fails so the next frame can recover.
 
-Run it after the Remix app is running:
+Run it on any computer with Python and a webcam after the BroodCast server is reachable:
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-BROODCAST_API_URL=http://localhost:44100 STREAM_INGEST_TOKEN=dev-stream-token python main.py
+python main.py \
+  --server http://localhost:44100 \
+  --token dev-stream-token \
+  --camera 0 \
+  --device-id garage-laptop \
+  --location-id garage_brooder \
+  --camera-id brooder_wide
 ```
+
+The same command can point at a cloud server:
+
+```sh
+python main.py --server https://your-broodcast-server.example --token "$STREAM_INGEST_TOKEN" --camera 0
+```
+
+Use `--fake-camera --max-frames 5` for a smoke test without a webcam.
 
 From the repo root, run both local dev loops together:
 
@@ -81,6 +95,9 @@ Environment variables:
 - `BROODCAST_API_URL`: Remix app base URL. Defaults to `http://localhost:44100`.
 - `CHICKCOACH_API_URL`: legacy alias for `BROODCAST_API_URL`.
 - `STREAM_INGEST_TOKEN`: Bearer token for `/api/ingest/observation`.
+- `BROODCAST_EDGE_DEVICE_ID`: stable id for the computer running capture.
+- `BROODCAST_LOCATION_ID`: logical location id, such as `garage_brooder` or `north_coop`.
+- `BROODCAST_CAMERA_ID`: logical camera id for this webcam view.
 - `CAMERA_INDEX`: OpenCV camera index. Defaults to `0`.
 - `CAPTURE_INTERVAL_SECONDS`: seconds between frames. Defaults to `3`.
 - `CHICKCOACH_FAKE_CAMERA=1`: skip webcam capture and generate a moving test frame.

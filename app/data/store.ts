@@ -139,6 +139,17 @@ export type ChickIdentity = {
   example_bbox: number[] | null
 }
 
+export type InteractionLog = {
+  id: string
+  created_at: string
+  kind: 'chat' | 'annotation_saved' | 'annotation_assist' | 'chick_named' | 'manual_note'
+  observation_id: string | null
+  frame_id: string | null
+  actor: 'public' | 'admin' | 'edge' | 'unknown'
+  summary: string
+  metadata: Record<string, unknown>
+}
+
 export type CareComplianceState = {
   heatSource: { status: 'checked' | 'needs_check' | 'unknown'; lastCheckedAt?: string }
   food: {
@@ -176,6 +187,7 @@ type StoreState = {
   zones: BrooderZone[]
   annotations: BrooderAnnotation[]
   chickIdentities: ChickIdentity[]
+  interactionLogs: InteractionLog[]
   compliance: CareComplianceState
   publicVisible: boolean
 }
@@ -199,6 +211,7 @@ function defaultState(): StoreState {
     zones: defaultZones,
     annotations: [],
     chickIdentities: [],
+    interactionLogs: [],
     compliance: defaultCompliance(),
     publicVisible: true,
   }
@@ -236,6 +249,7 @@ async function loadState() {
     state = JSON.parse(await readFile(storePath, 'utf8')) as StoreState
     state.annotations ??= []
     state.chickIdentities ??= []
+    state.interactionLogs ??= []
     state.compliance = { ...defaultCompliance(), ...(state.compliance ?? {}) }
   } catch {
     state = defaultState()
@@ -434,6 +448,35 @@ export async function addAnnotation(input: {
   current.annotations = [annotation, ...current.annotations].slice(0, 500)
   await persist()
   return annotation
+}
+
+export async function listInteractionLogs(limit = 100) {
+  let current = await loadState()
+  return current.interactionLogs.slice(0, limit)
+}
+
+export async function logInteraction(input: {
+  kind: InteractionLog['kind']
+  observation_id?: string | null
+  frame_id?: string | null
+  actor?: InteractionLog['actor']
+  summary: string
+  metadata?: Record<string, unknown>
+}) {
+  let current = await loadState()
+  let log: InteractionLog = {
+    id: randomUUID(),
+    created_at: new Date().toISOString(),
+    kind: input.kind,
+    observation_id: input.observation_id ?? null,
+    frame_id: input.frame_id ?? null,
+    actor: input.actor ?? 'unknown',
+    summary: input.summary,
+    metadata: input.metadata ?? {},
+  }
+  current.interactionLogs = [log, ...current.interactionLogs].slice(0, 1000)
+  await persist()
+  return log
 }
 
 export async function getCompliance() {
