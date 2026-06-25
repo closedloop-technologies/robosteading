@@ -61,7 +61,8 @@ type DashboardPageProps = {
 }
 
 export function safeAdminNextPath(value: string) {
-  return value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') ? value : '/broodcast/dashboard'
+  if (value === '/broodcast' || value.startsWith('/broodcast/') || value.startsWith('/broodcast?')) return value
+  return '/broodcast/dashboard'
 }
 
 export const live = {

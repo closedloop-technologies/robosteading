@@ -13,15 +13,20 @@ function loginRequest(next: string, token = 'broodcast') {
   })
 }
 
-test('safeAdminNextPath accepts local absolute paths', () => {
+test('safeAdminNextPath accepts BroodCast paths', () => {
+  assert.equal(safeAdminNextPath('/broodcast'), '/broodcast')
   assert.equal(safeAdminNextPath('/broodcast/dashboard'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('/broodcast/live?tab=peeps'), '/broodcast/live?tab=peeps')
+  assert.equal(safeAdminNextPath('/broodcast?view=live'), '/broodcast?view=live')
 })
 
-test('safeAdminNextPath rejects non-local redirect targets', () => {
+test('safeAdminNextPath rejects non-BroodCast redirect targets', () => {
   assert.equal(safeAdminNextPath('https://evil.example'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('//evil.example/broodcast'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('/\\evil.example'), '/broodcast/dashboard')
+  assert.equal(safeAdminNextPath('/'), '/broodcast/dashboard')
+  assert.equal(safeAdminNextPath('/api/latest'), '/broodcast/dashboard')
+  assert.equal(safeAdminNextPath('/broodcastevil'), '/broodcast/dashboard')
 })
 
 test('loginAction redirects valid admin logins to sanitized local targets', async () => {
