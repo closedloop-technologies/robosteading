@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { loginAction, safeAdminNextPath } from './broodcast.tsx'
+import { loginAction, safeAdminNextPath, safeFrameFilename } from './broodcast.tsx'
 import { adminCookie, adminToken, isAdminRequest } from '../data/auth.ts'
 
 function loginRequest(next: string, token = 'broodcast') {
@@ -54,6 +54,18 @@ test('loginAction keeps failed tokens on the login flow', async () => {
   assert.equal(response.status, 303)
   assert.equal(response.headers.get('Location'), '/broodcast/login?error=1')
   assert.equal(response.headers.has('Set-Cookie'), false)
+})
+
+test('safeFrameFilename preserves expected image names', () => {
+  assert.equal(safeFrameFilename('frame-01.png'), 'frame-01.png')
+  assert.equal(safeFrameFilename('coop/frame 02.jpeg'), 'coopframe02.jpg')
+  assert.equal(safeFrameFilename('camera.alpha.jpg'), 'cameraalpha.jpg')
+})
+
+test('safeFrameFilename falls back when frame ids have no safe stem', () => {
+  let filename = safeFrameFilename('../..')
+  assert.match(filename, /^[0-9a-f-]{36}\.jpg$/)
+  assert.notEqual(filename, '.jpg')
 })
 
 test('adminToken ignores blank higher-priority environment values', () => {

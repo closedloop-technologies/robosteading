@@ -982,9 +982,16 @@ function ObservationTable() {
   )
 }
 
+export function safeFrameFilename(frameId: unknown) {
+  let raw = typeof frameId === 'string' ? frameId.trim() : ''
+  let extension = raw.toLowerCase().endsWith('.png') ? '.png' : '.jpg'
+  let stem = raw.replace(/\.(?:jpe?g|png)$/i, '').replace(/[^a-zA-Z0-9_-]/g, '')
+  if (!stem) stem = randomUUID()
+  return `${stem}${extension}`
+}
+
 async function saveBase64Frame(value: string, frameId: unknown) {
-  let safeId = typeof frameId === 'string' ? frameId.replace(/[^a-zA-Z0-9_.-]/g, '') : randomUUID()
-  let filename = safeId.endsWith('.jpg') || safeId.endsWith('.png') ? safeId : `${safeId}.jpg`
+  let filename = safeFrameFilename(frameId)
   let base64 = value.includes(',') ? value.split(',').pop()! : value
   let buffer = Buffer.from(base64, 'base64')
   await mkdir(join(process.cwd(), 'public', 'uploads'), { recursive: true })
