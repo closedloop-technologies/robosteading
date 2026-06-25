@@ -1,7 +1,14 @@
 const cookieName = 'broodcast_admin'
 
 export function adminToken() {
-  return process.env.ADMIN_TOKEN ?? process.env.BROODCAST_ADMIN_TOKEN ?? process.env.CHICKCOACH_ADMIN_TOKEN ?? 'broodcast'
+  for (let value of [
+    process.env.ADMIN_TOKEN,
+    process.env.BROODCAST_ADMIN_TOKEN,
+    process.env.CHICKCOACH_ADMIN_TOKEN,
+  ]) {
+    if (value?.trim()) return value.trim()
+  }
+  return 'broodcast'
 }
 
 export function isAdminRequest(request: Request) {
