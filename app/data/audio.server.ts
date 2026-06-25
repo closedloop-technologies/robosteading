@@ -29,6 +29,15 @@ function normalizeBins(value: unknown) {
     .filter((channel) => channel.length > 0)
 }
 
+function normalizeLevels(value: unknown, bins: number[][]) {
+  let levels = Array.isArray(value)
+    ? value.slice(0, 2).map((level) => Math.max(0, Math.min(1, finiteNumber(level, 0))))
+    : []
+  if (levels.length > 0) return levels
+
+  return bins.map((channel) => Math.max(0, ...channel)).slice(0, 2)
+}
+
 export function addAudioSpectrumFrame(input: Record<string, unknown>) {
   let bins = normalizeBins(input.bins)
   if (!bins.length) {
@@ -43,9 +52,7 @@ export function addAudioSpectrumFrame(input: Record<string, unknown>) {
     channels,
     mode: channels > 1 || bins.length > 1 ? 'stereo' : 'mono',
     bins,
-    levels: Array.isArray(input.levels)
-      ? input.levels.slice(0, 2).map((level) => Math.max(0, Math.min(1, finiteNumber(level, 0))))
-      : bins.map((channel) => Math.max(0, ...channel)),
+    levels: normalizeLevels(input.levels, bins),
   }
 
   audioFrames = [frame, ...audioFrames].slice(0, 120)
