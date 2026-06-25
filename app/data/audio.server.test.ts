@@ -42,6 +42,16 @@ test('addAudioSpectrumFrame preserves bounded client-provided levels', () => {
   assert.deepEqual(frame.levels, [1, 0])
 })
 
+test('addAudioSpectrumFrame caps client-provided levels to bin channels', () => {
+  let frame = addAudioSpectrumFrame({
+    bins: [[0.1]],
+    levels: [0.7, 0.9],
+  })
+
+  assert.deepEqual(frame.levels, [0.7])
+  assert.equal(frame.mode, 'mono')
+})
+
 test('addAudioSpectrumFrame preserves clean client timestamps', () => {
   let frame = addAudioSpectrumFrame({
     bins: [[0.1]],

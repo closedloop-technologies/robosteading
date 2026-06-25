@@ -33,7 +33,7 @@ function normalizeLevels(value: unknown, bins: number[][]) {
   let levels = Array.isArray(value)
     ? value.slice(0, 2).map((level) => Math.max(0, Math.min(1, finiteNumber(level, 0))))
     : []
-  if (levels.length > 0) return levels
+  if (levels.length > 0) return levels.slice(0, bins.length)
 
   return bins.map((channel) => Math.max(0, ...channel)).slice(0, 2)
 }
