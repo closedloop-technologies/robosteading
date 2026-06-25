@@ -48,6 +48,9 @@ function normalizeTimestamp(value: unknown) {
   })) {
     throw new Error('Audio frame timestamp must not contain control characters.')
   }
+  if (!Number.isFinite(Date.parse(value))) {
+    throw new Error('Audio frame timestamp must be a valid date.')
+  }
   return value
 }
 

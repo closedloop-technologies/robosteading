@@ -64,4 +64,8 @@ test('addAudioSpectrumFrame rejects malformed client timestamps', () => {
     () => addAudioSpectrumFrame({ bins: [[0.1]], timestamp: '' }),
     /Audio frame timestamp must be a non-empty string/,
   )
+  assert.throws(
+    () => addAudioSpectrumFrame({ bins: [[0.1]], timestamp: 'not-a-date' }),
+    /Audio frame timestamp must be a valid date/,
+  )
 })
