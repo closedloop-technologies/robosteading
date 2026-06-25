@@ -1,12 +1,11 @@
 import type { RemixNode } from 'remix/ui'
 import { renderToStream } from 'remix/ui/server'
 
-import { router } from '../router.ts'
-
 export function render(node: RemixNode, request: Request, init?: ResponseInit) {
   let stream = renderToStream(node, {
     frameSrc: request.url,
     async resolveFrame(src, target) {
+      let { router } = await import('../router.ts')
       let headers = new Headers({ accept: 'text/html' })
       let cookie = request.headers.get('cookie')
       if (cookie) headers.set('cookie', cookie)

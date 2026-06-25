@@ -60,6 +60,10 @@ type DashboardPageProps = {
   peeps: PeepActivity
 }
 
+export function safeAdminNextPath(value: string) {
+  return value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') ? value : '/broodcast/dashboard'
+}
+
 export const live = {
   async handler({ request }: { request: Request }) {
     let latest = await latestObservation()
@@ -147,7 +151,7 @@ export const loginAction = {
     let token = String(form.get('token') ?? '')
     let next = String(form.get('next') ?? '/broodcast/dashboard')
     if (token !== adminToken()) return redirect('/broodcast/login?error=1')
-    return redirect(next.startsWith('/') ? next : '/broodcast/dashboard', 303, { 'Set-Cookie': adminCookie() })
+    return redirect(safeAdminNextPath(next), 303, { 'Set-Cookie': adminCookie() })
   },
 }
 
