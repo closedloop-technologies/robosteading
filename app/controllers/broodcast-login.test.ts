@@ -41,6 +41,14 @@ test('loginAction redirects valid admin logins to sanitized local targets', asyn
   assert.equal(rejected.headers.get('Location'), '/broodcast/dashboard')
 })
 
+test('loginAction trims pasted admin tokens', async () => {
+  let response = await loginAction.handler({ request: loginRequest('/broodcast/report', ' broodcast\n') })
+
+  assert.equal(response.status, 303)
+  assert.equal(response.headers.get('Location'), '/broodcast/report')
+  assert.match(response.headers.get('Set-Cookie') ?? '', /broodcast_admin=broodcast/)
+})
+
 test('loginAction keeps failed tokens on the login flow', async () => {
   let response = await loginAction.handler({ request: loginRequest('/broodcast/report', 'wrong-token') })
   assert.equal(response.status, 303)

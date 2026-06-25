@@ -149,7 +149,7 @@ export const login = {
 export const loginAction = {
   async handler({ request }: { request: Request }) {
     let form = await request.formData()
-    let token = String(form.get('token') ?? '')
+    let token = String(form.get('token') ?? '').trim()
     let next = String(form.get('next') ?? '/broodcast/dashboard')
     if (token !== adminToken()) return redirect('/broodcast/login?error=1')
     return redirect(safeAdminNextPath(next), 303, { 'Set-Cookie': adminCookie() })
