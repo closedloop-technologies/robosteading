@@ -41,3 +41,27 @@ test('addAudioSpectrumFrame preserves bounded client-provided levels', () => {
 
   assert.deepEqual(frame.levels, [1, 0])
 })
+
+test('addAudioSpectrumFrame preserves clean client timestamps', () => {
+  let frame = addAudioSpectrumFrame({
+    bins: [[0.1]],
+    timestamp: '2026-06-25T12:00:00.000Z',
+  })
+
+  assert.equal(frame.observed_at, '2026-06-25T12:00:00.000Z')
+})
+
+test('addAudioSpectrumFrame rejects malformed client timestamps', () => {
+  assert.throws(
+    () => addAudioSpectrumFrame({ bins: [[0.1]], timestamp: ' 2026-06-25T12:00:00.000Z' }),
+    /Audio frame timestamp must be trimmed/,
+  )
+  assert.throws(
+    () => addAudioSpectrumFrame({ bins: [[0.1]], timestamp: '2026-06-25T12:00:00.000Z\x7f' }),
+    /Audio frame timestamp must not contain control characters/,
+  )
+  assert.throws(
+    () => addAudioSpectrumFrame({ bins: [[0.1]], timestamp: '' }),
+    /Audio frame timestamp must be a non-empty string/,
+  )
+})

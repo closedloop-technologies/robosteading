@@ -38,6 +38,19 @@ function normalizeLevels(value: unknown, bins: number[][]) {
   return bins.map((channel) => Math.max(0, ...channel)).slice(0, 2)
 }
 
+function normalizeTimestamp(value: unknown) {
+  if (typeof value !== 'string') return new Date().toISOString()
+  if (!value.trim()) throw new Error('Audio frame timestamp must be a non-empty string.')
+  if (value !== value.trim()) throw new Error('Audio frame timestamp must be trimmed.')
+  if ([...value].some((character) => {
+    let codePoint = character.codePointAt(0)
+    return codePoint !== undefined && (codePoint < 32 || codePoint === 127)
+  })) {
+    throw new Error('Audio frame timestamp must not contain control characters.')
+  }
+  return value
+}
+
 export function addAudioSpectrumFrame(input: Record<string, unknown>) {
   let bins = normalizeBins(input.bins)
   if (!bins.length) {
@@ -47,7 +60,7 @@ export function addAudioSpectrumFrame(input: Record<string, unknown>) {
   let channels = Math.max(1, Math.min(2, Math.round(finiteNumber(input.channels, bins.length))))
   let frame: AudioSpectrumFrame = {
     id: nextAudioFrameId++,
-    observed_at: typeof input.timestamp === 'string' ? input.timestamp : new Date().toISOString(),
+    observed_at: normalizeTimestamp(input.timestamp),
     sample_rate: Math.max(1, Math.round(finiteNumber(input.sample_rate, 48000))),
     channels,
     mode: channels > 1 || bins.length > 1 ? 'stereo' : 'mono',
