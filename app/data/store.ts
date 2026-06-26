@@ -340,9 +340,9 @@ function normalizeAudio(value: unknown): ObservationAudio | null {
     source: typeof input.source === 'string' ? input.source : 'local_mic_frequency_filter',
     raw_audio_uploaded: false,
     human_voice_uploaded: false,
-    window_seconds: typeof input.window_seconds === 'number' ? input.window_seconds : undefined,
-    sample_rate_hz: typeof input.sample_rate_hz === 'number' ? input.sample_rate_hz : undefined,
-    filter_band_hz: Array.isArray(input.filter_band_hz) ? input.filter_band_hz.map(Number).slice(0, 2) : undefined,
+    window_seconds: optionalFiniteNumber(input.window_seconds),
+    sample_rate_hz: optionalFiniteNumber(input.sample_rate_hz),
+    filter_band_hz: optionalFiniteNumberList(input.filter_band_hz, 2),
     events,
   }
 }
@@ -364,6 +364,19 @@ function normalizePeepEvent(value: unknown): PeepEvent | null {
 
 function finiteNumber(value: unknown, fallback: number) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function optionalFiniteNumber(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string' || !value.trim()) return undefined
+  let parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function optionalFiniteNumberList(value: unknown, limit: number) {
+  if (!Array.isArray(value)) return undefined
+  let numbers = value.map(optionalFiniteNumber).filter((number): number is number => number !== undefined)
+  return numbers.length > 0 ? numbers.slice(0, limit) : undefined
 }
 
 export async function addManualNote(note: string, visibility: 'private' | 'public') {
