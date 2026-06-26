@@ -80,10 +80,10 @@ export function safeAdminNextPath(value: string) {
   })) {
     return '/broodcast/dashboard'
   }
-  let pathSegments = decodedPath.split('/')
-  if (/\s/u.test(decodedPath)) {
+  if (/\s/u.test(decodedValue)) {
     return '/broodcast/dashboard'
   }
+  let pathSegments = decodedPath.split('/')
   if (
     decodedPath.includes('\\') ||
     decodedPath.split('/').length !== path.split('/').length ||
