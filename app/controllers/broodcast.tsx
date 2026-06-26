@@ -125,9 +125,11 @@ export function safeAnnotatedFrameUrl(value: unknown) {
     return null
   }
   if (/[\s\x00-\x1F\x7F]/u.test(decodedValue)) return null
-  if (decodedValue.split('/').some((segment) => segment === '.' || segment === '..')) return null
+  let pathSegments = decodedValue.split('/')
+  if (pathSegments.length !== 3) return null
+  if (pathSegments.some((segment) => segment === '.' || segment === '..')) return null
   if (decodedValue !== value) return null
-  let filename = decodedValue.split('/').at(-1) ?? ''
+  let filename = pathSegments.at(-1) ?? ''
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*\.(?:jpe?g|png|webp)$/i.test(filename)) return null
 
   return value
