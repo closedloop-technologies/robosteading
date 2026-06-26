@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
+  apiAnnotations,
   loginAction,
   safeAudioFrameAfter,
   safeAdminNextPath,
@@ -158,6 +159,23 @@ test('safeAudioFrameAfter rejects malformed audio frame cursors', () => {
   for (let value of ['-1', '1.5', ' 1', '1 ', 'Infinity', 'NaN', '9007199254740992']) {
     assert.equal(safeAudioFrameAfter(value), 0, value)
   }
+})
+
+test('apiAnnotations rejects blank geometry coordinates', async () => {
+  let response = await apiAnnotations.handler({
+    request: new Request('http://localhost/broodcast/api/annotations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        label: 'heater',
+        kind: 'box',
+        box: ['', 1, 2, 3],
+      }),
+    }),
+  })
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), { ok: false, error: 'Box annotations need four coordinates.' })
 })
 
 test('adminToken ignores blank higher-priority environment values', () => {

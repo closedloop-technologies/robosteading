@@ -470,8 +470,19 @@ export const apiAnnotations = {
 
 function readNumberTuple(value: unknown, length: number) {
   if (!Array.isArray(value)) return null
-  let numbers = value.map(Number).slice(0, length)
-  return numbers.length === length && numbers.every(Number.isFinite) ? numbers.map(Math.round) : null
+  let numbers = value.slice(0, length).map(readFiniteNumber)
+  return numbers.length === length && numbers.every((number): number is number => number !== null)
+    ? numbers.map(Math.round)
+    : null
+}
+
+function readFiniteNumber(value: unknown) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value !== 'string') return null
+  let trimmed = value.trim()
+  if (!/^-?\d+(?:\.\d+)?$/u.test(trimmed)) return null
+  let parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function readCorners(value: unknown) {
