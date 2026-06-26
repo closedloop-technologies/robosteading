@@ -55,6 +55,9 @@ function normalizeTimestamp(value: unknown) {
 }
 
 export function addAudioSpectrumFrame(input: Record<string, unknown>) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Audio frame payload must be an object.')
+  }
   let bins = normalizeBins(input.bins)
   if (!bins.length) {
     throw new Error('Audio frame requires one or two non-empty bin arrays.')

@@ -3,6 +3,17 @@ import { test } from 'node:test'
 
 import { addAudioSpectrumFrame, latestAudioSpectrumFrame } from './audio.server.ts'
 
+test('addAudioSpectrumFrame rejects non-object payloads', () => {
+  assert.throws(
+    () => addAudioSpectrumFrame(null as unknown as Record<string, unknown>),
+    /Audio frame payload must be an object/,
+  )
+  assert.throws(
+    () => addAudioSpectrumFrame([] as unknown as Record<string, unknown>),
+    /Audio frame payload must be an object/,
+  )
+})
+
 test('addAudioSpectrumFrame derives bounded levels from bins when levels are omitted', () => {
   let frame = addAudioSpectrumFrame({
     bins: [
