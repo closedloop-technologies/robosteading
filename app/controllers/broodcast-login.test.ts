@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { loginAction, safeAdminNextPath, safeAnnotatedFrameUrl, safeFrameFilename } from './broodcast.tsx'
+import {
+  loginAction,
+  safeAdminNextPath,
+  safeAnnotatedFrameUrl,
+  safeFrameFilename,
+  safeRecentWindowMinutes,
+} from './broodcast.tsx'
 import { adminCookie, adminToken, isAdminRequest } from '../data/auth.ts'
 
 function loginRequest(next: string, token = 'broodcast') {
@@ -119,6 +125,19 @@ test('safeAnnotatedFrameUrl rejects unsafe frame URLs', () => {
     '/uploads/frame.jpg?cache=1',
   ]) {
     assert.equal(safeAnnotatedFrameUrl(value), null, value)
+  }
+})
+
+test('safeRecentWindowMinutes accepts bounded positive integer windows', () => {
+  assert.equal(safeRecentWindowMinutes(null, 30), 30)
+  assert.equal(safeRecentWindowMinutes('1', 30), 1)
+  assert.equal(safeRecentWindowMinutes('120', 30), 120)
+  assert.equal(safeRecentWindowMinutes('1440', 30), 1440)
+})
+
+test('safeRecentWindowMinutes rejects malformed or excessive windows', () => {
+  for (let value of ['0', '-1', '1.5', ' 30', '30 ', 'Infinity', 'NaN', '1441', '9007199254740992']) {
+    assert.equal(safeRecentWindowMinutes(value, 30), 30, value)
   }
 })
 

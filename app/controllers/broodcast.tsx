@@ -135,6 +135,14 @@ export function safeAnnotatedFrameUrl(value: unknown) {
   return value
 }
 
+export function safeRecentWindowMinutes(value: string | null, fallback: number) {
+  if (value === null) return fallback
+  if (!/^\d+$/u.test(value)) return fallback
+  let minutes = Number(value)
+  if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 1440) return fallback
+  return minutes
+}
+
 export const live = {
   async handler({ request }: { request: Request }) {
     let latest = await latestObservation()
@@ -253,15 +261,15 @@ export const apiLatest = {
 
 export const apiObservations = {
   async handler({ url }: { url: URL }) {
-    let minutes = Number(url.searchParams.get('minutes') ?? '30')
-    return json({ observations: await listObservations(Number.isFinite(minutes) ? minutes : 30) })
+    let minutes = safeRecentWindowMinutes(url.searchParams.get('minutes'), 30)
+    return json({ observations: await listObservations(minutes) })
   },
 }
 
 export const apiPeeps = {
   async handler({ url }: { url: URL }) {
-    let minutes = Number(url.searchParams.get('minutes') ?? '60')
-    return json(await peepActivity(Number.isFinite(minutes) ? minutes : 60))
+    let minutes = safeRecentWindowMinutes(url.searchParams.get('minutes'), 60)
+    return json(await peepActivity(minutes))
   },
 }
 
