@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { loginAction, safeAdminNextPath, safeFrameFilename } from './broodcast.tsx'
+import { loginAction, safeAdminNextPath, safeAnnotatedFrameUrl, safeFrameFilename } from './broodcast.tsx'
 import { adminCookie, adminToken, isAdminRequest } from '../data/auth.ts'
 
 function loginRequest(next: string, token = 'broodcast') {
@@ -74,6 +74,29 @@ test('safeFrameFilename falls back when frame ids have no safe stem', () => {
   let filename = safeFrameFilename('../..')
   assert.match(filename, /^[0-9a-f-]{36}\.jpg$/)
   assert.notEqual(filename, '.jpg')
+})
+
+test('safeAnnotatedFrameUrl accepts local uploaded image paths', () => {
+  assert.equal(safeAnnotatedFrameUrl('/uploads/frame-01.jpg'), '/uploads/frame-01.jpg')
+  assert.equal(safeAnnotatedFrameUrl('/uploads/camera-alpha.PNG'), '/uploads/camera-alpha.PNG')
+  assert.equal(safeAnnotatedFrameUrl('/uploads/latest.webp'), '/uploads/latest.webp')
+})
+
+test('safeAnnotatedFrameUrl rejects unsafe frame URLs', () => {
+  for (let value of [
+    'https://evil.example/frame.jpg',
+    '//evil.example/frame.jpg',
+    '/static/hero-bg.png',
+    '/uploads/../secret.jpg',
+    '/uploads/%2e%2e/secret.jpg',
+    '/uploads/camera%2fframe.jpg',
+    '/uploads/frame%0a.jpg',
+    '/uploads/bad path.jpg',
+    '/uploads/frame.svg',
+    '/uploads/frame.jpg?cache=1',
+  ]) {
+    assert.equal(safeAnnotatedFrameUrl(value), null, value)
+  }
 })
 
 test('adminToken ignores blank higher-priority environment values', () => {

@@ -91,6 +91,34 @@ export function safeAdminNextPath(value: string) {
   return '/broodcast/dashboard'
 }
 
+export function safeAnnotatedFrameUrl(value: unknown) {
+  if (typeof value !== 'string') return null
+  if (!value || value !== value.trim()) return null
+  if (!value.startsWith('/uploads/')) return null
+  if (value.includes('\\') || value.includes('//') || /[\s?#]/u.test(value)) return null
+  if ([...value].some((character) => {
+    let codePoint = character.codePointAt(0)
+    return codePoint !== undefined && (codePoint < 32 || codePoint === 127)
+  })) {
+    return null
+  }
+
+  let decodedValue: string
+  try {
+    decodedValue = decodeURIComponent(value)
+  } catch {
+    return null
+  }
+  if (decodedValue.includes('\\') || decodedValue.split('/').length !== value.split('/').length) {
+    return null
+  }
+  if (/[\s\x00-\x1F\x7F]/u.test(decodedValue)) return null
+  if (decodedValue.split('/').some((segment) => segment === '.' || segment === '..')) return null
+  if (!/\.(?:jpe?g|png|webp)$/i.test(decodedValue)) return null
+
+  return value
+}
+
 export const live = {
   async handler({ request }: { request: Request }) {
     let latest = await latestObservation()
@@ -296,7 +324,7 @@ export const apiIngestObservation = {
     }
 
     let input = body as Record<string, unknown>
-    let frameUrl = typeof input.annotated_frame_url === 'string' ? input.annotated_frame_url : null
+    let frameUrl = safeAnnotatedFrameUrl(input.annotated_frame_url)
     if (typeof input.annotated_frame_base64 === 'string') {
       frameUrl = await saveBase64Frame(input.annotated_frame_base64, input.frame_id)
     }
