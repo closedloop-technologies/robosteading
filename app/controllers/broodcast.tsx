@@ -1039,7 +1039,10 @@ function ObservationTable() {
 export function safeFrameFilename(frameId: unknown) {
   let raw = typeof frameId === 'string' ? frameId.trim() : ''
   let extension = raw.toLowerCase().endsWith('.png') ? '.png' : '.jpg'
-  let stem = raw.replace(/\.(?:jpe?g|png)$/i, '').replace(/[^a-zA-Z0-9_-]/g, '')
+  let stem = raw
+    .replace(/\.(?:jpe?g|png)$/i, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 80)
   if (!stem) stem = randomUUID()
   return `${stem}${extension}`
 }

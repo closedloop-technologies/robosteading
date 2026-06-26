@@ -76,6 +76,14 @@ test('safeFrameFilename falls back when frame ids have no safe stem', () => {
   assert.notEqual(filename, '.jpg')
 })
 
+test('safeFrameFilename caps long sanitized stems', () => {
+  let filename = safeFrameFilename(`${'camera-'.repeat(40)}frame.png`)
+
+  assert.equal(filename.length, 84)
+  assert.equal(filename.endsWith('.png'), true)
+  assert.equal(filename.slice(0, -4).length, 80)
+})
+
 test('safeAnnotatedFrameUrl accepts local uploaded image paths', () => {
   assert.equal(safeAnnotatedFrameUrl('/uploads/frame-01.jpg'), '/uploads/frame-01.jpg')
   assert.equal(safeAnnotatedFrameUrl('/uploads/camera-alpha.PNG'), '/uploads/camera-alpha.PNG')
