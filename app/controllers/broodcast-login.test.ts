@@ -3,6 +3,7 @@ import { test } from 'node:test'
 
 import {
   loginAction,
+  safeAudioFrameAfter,
   safeAdminNextPath,
   safeAnnotatedFrameUrl,
   safeFrameFilename,
@@ -138,6 +139,19 @@ test('safeRecentWindowMinutes accepts bounded positive integer windows', () => {
 test('safeRecentWindowMinutes rejects malformed or excessive windows', () => {
   for (let value of ['0', '-1', '1.5', ' 30', '30 ', 'Infinity', 'NaN', '1441', '9007199254740992']) {
     assert.equal(safeRecentWindowMinutes(value, 30), 30, value)
+  }
+})
+
+test('safeAudioFrameAfter accepts unsigned safe integer cursors', () => {
+  assert.equal(safeAudioFrameAfter(null), 0)
+  assert.equal(safeAudioFrameAfter('0'), 0)
+  assert.equal(safeAudioFrameAfter('1'), 1)
+  assert.equal(safeAudioFrameAfter('9007199254740991'), Number.MAX_SAFE_INTEGER)
+})
+
+test('safeAudioFrameAfter rejects malformed audio frame cursors', () => {
+  for (let value of ['-1', '1.5', ' 1', '1 ', 'Infinity', 'NaN', '9007199254740992']) {
+    assert.equal(safeAudioFrameAfter(value), 0, value)
   }
 })
 

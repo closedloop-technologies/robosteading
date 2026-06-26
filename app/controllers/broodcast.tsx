@@ -143,6 +143,14 @@ export function safeRecentWindowMinutes(value: string | null, fallback: number) 
   return minutes
 }
 
+export function safeAudioFrameAfter(value: string | null) {
+  if (value === null) return 0
+  if (!/^\d+$/u.test(value)) return 0
+  let after = Number(value)
+  if (!Number.isSafeInteger(after)) return 0
+  return after
+}
+
 export const live = {
   async handler({ request }: { request: Request }) {
     let latest = await latestObservation()
@@ -309,8 +317,7 @@ export const apiCompliance = {
 
 export const apiLatestAudioSpectrum = {
   async handler({ url }: { url: URL }) {
-    let after = Number(url.searchParams.get('after') ?? '0')
-    return json({ frame: latestAudioSpectrumFrame(Number.isFinite(after) ? after : 0) })
+    return json({ frame: latestAudioSpectrumFrame(safeAudioFrameAfter(url.searchParams.get('after'))) })
   },
 }
 
