@@ -86,6 +86,7 @@ export function safeAdminNextPath(value: string) {
   let pathSegments = decodedPath.split('/')
   if (
     decodedPath.includes('\\') ||
+    path.includes('//') ||
     decodedPath.split('/').length !== path.split('/').length ||
     decodedPath.includes('?') ||
     decodedPath.includes('#') ||
