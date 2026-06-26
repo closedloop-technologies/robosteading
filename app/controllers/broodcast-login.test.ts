@@ -101,6 +101,7 @@ test('safeAnnotatedFrameUrl rejects unsafe frame URLs', () => {
     '/uploads/%2e%2e/secret.jpg',
     '/uploads/camera%2fframe.jpg',
     '/uploads/frame%0a.jpg',
+    '/uploads/frame%41.jpg',
     '/uploads/bad path.jpg',
     '/uploads/frame.svg',
     '/uploads/frame.jpg?cache=1',
