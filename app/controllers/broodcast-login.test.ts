@@ -27,6 +27,8 @@ test('safeAdminNextPath rejects non-BroodCast redirect targets', () => {
   assert.equal(safeAdminNextPath('/\\evil.example'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('/broodcast/%2e%2e/api/latest'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('/broodcast/%5cevil.example'), '/broodcast/dashboard')
+  assert.equal(safeAdminNextPath('/broodcast/bad path'), '/broodcast/dashboard')
+  assert.equal(safeAdminNextPath('/broodcast/bad%20path'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('/broodcast/%zz'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('/broodcast/%0dSet-Cookie:bad'), '/broodcast/dashboard')
   assert.equal(safeAdminNextPath('/broodcast/dashboard?next=%0aSet-Cookie:bad'), '/broodcast/dashboard')

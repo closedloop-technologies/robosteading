@@ -81,6 +81,9 @@ export function safeAdminNextPath(value: string) {
     return '/broodcast/dashboard'
   }
   let pathSegments = decodedPath.split('/')
+  if (/\s/u.test(decodedPath)) {
+    return '/broodcast/dashboard'
+  }
   if (decodedPath.includes('\\') || pathSegments.includes('..') || pathSegments.includes('.')) {
     return '/broodcast/dashboard'
   }
