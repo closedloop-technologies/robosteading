@@ -61,6 +61,17 @@ type DashboardPageProps = {
 }
 
 export function safeAdminNextPath(value: string) {
+  let path = value.split(/[?#]/, 1)[0]
+  let decodedPath: string
+  try {
+    decodedPath = decodeURIComponent(path)
+  } catch {
+    return '/broodcast/dashboard'
+  }
+  let pathSegments = decodedPath.split('/')
+  if (decodedPath.includes('\\') || pathSegments.includes('..') || pathSegments.includes('.')) {
+    return '/broodcast/dashboard'
+  }
   if (value === '/broodcast' || value.startsWith('/broodcast/') || value.startsWith('/broodcast?')) return value
   return '/broodcast/dashboard'
 }
