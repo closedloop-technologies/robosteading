@@ -74,6 +74,9 @@ export function safeAdminNextPath(value: string) {
   } catch {
     return '/broodcast/dashboard'
   }
+  if (decodedValue !== value) {
+    return '/broodcast/dashboard'
+  }
   if ([...decodedValue].some((character) => {
     let codePoint = character.codePointAt(0)
     return codePoint !== undefined && (codePoint < 32 || codePoint === 127)
