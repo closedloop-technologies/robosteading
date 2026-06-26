@@ -84,7 +84,14 @@ export function safeAdminNextPath(value: string) {
   if (/\s/u.test(decodedPath)) {
     return '/broodcast/dashboard'
   }
-  if (decodedPath.includes('\\') || pathSegments.includes('..') || pathSegments.includes('.')) {
+  if (
+    decodedPath.includes('\\') ||
+    decodedPath.split('/').length !== path.split('/').length ||
+    decodedPath.includes('?') ||
+    decodedPath.includes('#') ||
+    pathSegments.includes('..') ||
+    pathSegments.includes('.')
+  ) {
     return '/broodcast/dashboard'
   }
   if (value === '/broodcast' || value.startsWith('/broodcast/') || value.startsWith('/broodcast?')) return value
