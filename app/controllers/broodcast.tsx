@@ -61,6 +61,7 @@ type DashboardPageProps = {
 }
 
 export function safeAdminNextPath(value: string) {
+  if (value.includes('#')) return '/broodcast/dashboard'
   let path = value.split(/[?#]/, 1)[0]
   let decodedPath: string
   try {
