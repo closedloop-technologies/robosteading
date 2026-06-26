@@ -68,6 +68,18 @@ export function safeAdminNextPath(value: string) {
   } catch {
     return '/broodcast/dashboard'
   }
+  let decodedValue: string
+  try {
+    decodedValue = decodeURIComponent(value)
+  } catch {
+    return '/broodcast/dashboard'
+  }
+  if ([...decodedValue].some((character) => {
+    let codePoint = character.codePointAt(0)
+    return codePoint !== undefined && (codePoint < 32 || codePoint === 127)
+  })) {
+    return '/broodcast/dashboard'
+  }
   let pathSegments = decodedPath.split('/')
   if (decodedPath.includes('\\') || pathSegments.includes('..') || pathSegments.includes('.')) {
     return '/broodcast/dashboard'
