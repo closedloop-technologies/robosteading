@@ -1073,6 +1073,7 @@ export function safeFrameFilename(frameId: unknown) {
   let stem = raw
     .replace(/\.(?:jpe?g|png)$/i, '')
     .replace(/[^a-zA-Z0-9_-]/g, '')
+    .replace(/^[^a-zA-Z0-9]+/u, '')
     .slice(0, 80)
   if (!stem) stem = randomUUID()
   return `${stem}${extension}`

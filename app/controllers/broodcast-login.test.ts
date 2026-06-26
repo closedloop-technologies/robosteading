@@ -101,6 +101,11 @@ test('safeFrameFilename caps long sanitized stems', () => {
   assert.equal(filename.slice(0, -4).length, 80)
 })
 
+test('safeFrameFilename removes leading punctuation from sanitized stems', () => {
+  assert.equal(safeFrameFilename('-frame.jpg'), 'frame.jpg')
+  assert.equal(safeFrameFilename('__camera.png'), 'camera.png')
+})
+
 test('safeAnnotatedFrameUrl accepts local uploaded image paths', () => {
   assert.equal(safeAnnotatedFrameUrl('/uploads/frame-01.jpg'), '/uploads/frame-01.jpg')
   assert.equal(safeAnnotatedFrameUrl('/uploads/camera-alpha.PNG'), '/uploads/camera-alpha.PNG')
